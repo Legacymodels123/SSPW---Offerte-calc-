@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zwembad prijsindicatie — Sun Sauna &amp; Poolworld</title>
+<!--
+  ============================================================================
+  BOUWKUNDIG ZWEMBAD — PRIJSINDICATIE CALCULATOR  (v1)
+  Sun Sauna & Poolworld
+  ----------------------------------------------------------------------------
+  - 1 los HTML-bestand met inline CSS + JavaScript (geen externe libraries).
+  - Klantgerichte website-calculator. GEEN interne tool / GEEN officiële factuur.
+  - Toont een INDICATIEVE prijs. De volledige indicatie verschijnt pas NA het
+    invullen van de contactgegevens (leadcapture).
+  - Prijzen komen uit de bevestigde prijslogica (zie CONFIG hieronder).
+
+  >>> PRIJZEN AANPASSEN?  Alles staat in het blok "CONFIG" onderaan in <script>.
+      Zoek op:  /* ===== CONFIG: PRIJZEN AANPASSEN ===== */
+  >>> SUPABASE AANPASSEN?  Zoek op:  SUPABASE_URL  (leads gaan naar tabel "calculator_leads")
+  >>> BTW-TARIEF AANPASSEN?  Zoek op:  BTW_TARIEF
+  ============================================================================
+-->
+<style>
+  /* ====================================================================
+     HUISSTIJL / KLEUREN  — pas hier de merkkleuren aan naar wens.
+     (Vervang de hex-codes door de exacte kleuren van sspw.nl indien bekend.)
+     ==================================================================== */
+  .ssc-calc{
+    /* Huisstijl Sun Sauna & Poolworld: zwart/wit, antraciet tekst, goudkleurige knoppen. */
+    --c-primary:#b8954f;     /* GOUD — knoppen, selectie, accenten */
+    --c-primary-d:#9c7c39;   /* donkerder goud (hover) */
+    --c-accent:#b8954f;      /* CTA = zelfde goud */
+    --c-accent-d:#9c7c39;
+    --c-ink:#2b2b2b;         /* antraciet — koppen/tekst-accent */
+    --c-black:#000000;       /* zwart — header / prijsvlak */
+    --c-bg:#ffffff;          /* achtergrond (wit) */
+    --c-card:#ffffff;        /* kaarten / vlakken */
+    --c-text:#2b2b2b;        /* tekst (antraciet) */
+    --c-muted:#6b6b6b;       /* subtiele tekst */
+    --c-border:#e3e3e3;      /* randen */
+    --c-ok:#2e7d32;          /* bevestiging / groen */
+    --c-err:#c62828;         /* foutmelding / rood */
+    --radius:14px;
+    --shadow:0 6px 24px rgba(0,0,0,.10);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--c-text);
+    line-height:1.5;
+    box-sizing:border-box;
+    max-width:760px;
+    margin:0 auto;
+    padding:18px;
+  }
+  .ssc-calc *,.ssc-calc *::before,.ssc-calc *::after{box-sizing:border-box;}
+  .ssc-calc h1,.ssc-calc h2,.ssc-calc h3,.ssc-calc p{margin:0 0 .4em;}
+  .ssc-card{background:var(--c-card);border:1px solid var(--c-border);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px;}
+  .ssc-head{text-align:center;margin-bottom:14px;}
+  .ssc-head h1{font-size:1.5rem;color:var(--c-ink);}
+  .ssc-head p{color:var(--c-muted);font-size:.95rem;}
+
+  /* Merk-header (zwart) met logo-mark + bedrijfsnaam */
+  .ssc-brand{background:var(--c-black);border-radius:var(--radius) var(--radius) 0 0;display:flex;align-items:center;justify-content:center;gap:14px;padding:16px 18px;box-shadow:var(--shadow);}
+  .ssc-brand .mark{display:flex;gap:3px;align-items:flex-end;height:38px;}
+  .ssc-brand .mark span{display:block;width:7px;border-radius:1px;background:#fff;}
+  .ssc-brand .mark .b1{height:38px;}
+  .ssc-brand .mark .b2{height:21px;}
+  .ssc-brand .mark .b3{height:30px;background:var(--c-primary);}
+  .ssc-brand .txt{display:flex;flex-direction:column;line-height:1.12;}
+  .ssc-brand .name{color:#fff;font-weight:800;letter-spacing:.06em;font-size:1.02rem;}
+  .ssc-brand .tag{color:var(--c-primary);font-size:.64rem;letter-spacing:.22em;margin-top:3px;}
+  .ssc-brand + .ssc-card{border-radius:0 0 var(--radius) var(--radius);border-top:none;}
+
+  /* Voortgangsbalk */
+  .ssc-steps{display:flex;gap:8px;margin-bottom:18px;}
+  .ssc-steps .s{flex:1;height:6px;border-radius:6px;background:var(--c-border);}
+  .ssc-steps .s.active{background:var(--c-primary);}
+  .ssc-steps .s.done{background:var(--c-black);}
+  .ssc-stepname{font-size:.82rem;color:var(--c-muted);text-align:center;margin-bottom:16px;}
+
+  /* Maatkaarten */
+  .ssc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;}
+  .ssc-opt{position:relative;border:2px solid var(--c-border);border-radius:var(--radius);padding:14px;cursor:pointer;transition:.15s;background:#fff;}
+  .ssc-opt:hover{border-color:var(--c-primary);}
+  .ssc-opt.sel{border-color:var(--c-primary);background:#faf6ea;}
+  .ssc-opt .t{font-weight:700;font-size:1.02rem;color:var(--c-ink);}
+  .ssc-opt .sub{font-size:.84rem;color:var(--c-muted);margin-top:2px;}
+  .ssc-opt .from{margin-top:8px;font-size:.86rem;color:var(--c-text);}
+  .ssc-opt .from b{color:var(--c-primary-d);}
+  .ssc-opt input{position:absolute;opacity:0;pointer-events:none;}
+
+  /* Optiegroepen (stap 2) */
+  .ssc-group{margin-bottom:18px;}
+  .ssc-group > .lbl{font-weight:700;color:var(--c-ink);margin-bottom:8px;display:block;}
+  .ssc-choice{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--c-border);border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:.15s;}
+  .ssc-choice:hover{border-color:var(--c-primary);}
+  .ssc-choice.sel{border-color:var(--c-primary);background:#faf6ea;}
+  .ssc-choice .c-l{display:flex;align-items:flex-start;gap:10px;}
+  .ssc-choice .c-l .nm{font-weight:600;}
+  .ssc-choice .c-l .ds{font-size:.82rem;color:var(--c-muted);}
+  .ssc-choice .price{white-space:nowrap;font-weight:700;color:var(--c-accent-d);font-size:.92rem;}
+  .ssc-choice .price.incl{color:var(--c-ok);}
+  .ssc-choice input{margin-top:3px;width:18px;height:18px;accent-color:var(--c-primary);}
+
+  /* Formuliervelden */
+  .ssc-field{margin-bottom:14px;}
+  .ssc-field label{display:block;font-weight:600;margin-bottom:5px;font-size:.92rem;}
+  .ssc-field .req{color:var(--c-err);}
+  .ssc-field input,.ssc-field textarea,.ssc-field select{width:100%;padding:11px 12px;border:1px solid var(--c-border);border-radius:10px;font-size:1rem;font-family:inherit;color:var(--c-text);background:#fff;}
+  .ssc-field select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path fill='%235b6b7b' d='M1 1l5 5 5-5'/></svg>");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;cursor:pointer;}
+  .ssc-field input:focus,.ssc-field textarea:focus,.ssc-field select:focus{outline:none;border-color:var(--c-primary);box-shadow:0 0 0 3px rgba(184,149,79,.25);}
+  .ssc-field .err{color:var(--c-err);font-size:.82rem;margin-top:4px;display:none;}
+  .ssc-field.invalid input,.ssc-field.invalid textarea,.ssc-field.invalid select{border-color:var(--c-err);}
+  .ssc-field.invalid .err{display:block;}
+  .ssc-row{display:flex;gap:12px;flex-wrap:wrap;}
+  .ssc-row .ssc-field{flex:1;min-width:180px;}
+  .ssc-consent{display:flex;align-items:flex-start;gap:9px;font-size:.88rem;color:var(--c-muted);}
+  .ssc-consent input{width:18px;height:18px;margin-top:2px;accent-color:var(--c-primary);}
+  .ssc-consent a{color:var(--c-primary);}
+
+  /* Teaser-balk */
+  .ssc-teaser{background:#faf6ea;border:1px dashed var(--c-primary);border-radius:12px;padding:14px 16px;text-align:center;margin-bottom:16px;}
+  .ssc-teaser .small{font-size:.84rem;color:var(--c-muted);}
+  .ssc-teaser .big{font-size:1.25rem;font-weight:800;color:var(--c-primary-d);}
+
+  /* Knoppen */
+  .ssc-nav{display:flex;justify-content:space-between;gap:12px;margin-top:18px;}
+  .ssc-btn{appearance:none;border:none;border-radius:10px;padding:13px 20px;font-size:1rem;font-weight:700;cursor:pointer;transition:.15s;font-family:inherit;}
+  .ssc-btn.primary{background:var(--c-primary);color:#fff;}
+  .ssc-btn.primary:hover{background:var(--c-primary-d);}
+  .ssc-btn.accent{background:var(--c-accent);color:#fff;}
+  .ssc-btn.accent:hover{background:var(--c-accent-d);}
+  .ssc-btn.ghost{background:#fff;color:var(--c-primary);border:1px solid var(--c-border);}
+  .ssc-btn.ghost:hover{border-color:var(--c-primary);}
+  .ssc-btn:disabled{opacity:.45;cursor:not-allowed;}
+  .ssc-btn.block{width:100%;}
+
+  /* Resultaat */
+  .ssc-result .total-box{background:var(--c-black);color:#fff;border-radius:var(--radius);padding:20px;text-align:center;margin-bottom:16px;}
+  .ssc-result .total-box .lbl{font-size:.9rem;opacity:.85;}
+  .ssc-result .total-box .amt{font-size:1.9rem;font-weight:800;margin:4px 0;color:var(--c-primary);}
+  .ssc-result .total-box .vat{font-size:.82rem;opacity:.9;}
+  .ssc-lines{border:1px solid var(--c-border);border-radius:12px;overflow:hidden;margin-bottom:14px;}
+  .ssc-lines .ln{display:flex;justify-content:space-between;gap:10px;padding:11px 14px;border-bottom:1px solid var(--c-border);font-size:.92rem;}
+  .ssc-lines .ln:last-child{border-bottom:none;}
+  .ssc-lines .ln.sub{font-weight:700;background:#faf8f3;color:var(--c-ink);}
+  .ssc-lines .ln .v{white-space:nowrap;}
+  .ssc-note{background:#fff7e6;border:1px solid #f3d28a;border-radius:10px;padding:11px 14px;font-size:.85rem;color:#7a5a00;margin-bottom:14px;}
+  .ssc-disclaimer{font-size:.82rem;color:var(--c-muted);margin:14px 0;}
+  .ssc-cta{display:flex;flex-direction:column;gap:10px;}
+  .ssc-success{background:#e8f5e9;border:1px solid #a5d6a7;color:#1b5e20;border-radius:10px;padding:12px 14px;font-size:.9rem;margin-bottom:14px;}
+  .ssc-hide{display:none !important;}
+  .ssc-foot{text-align:center;font-size:.76rem;color:var(--c-muted);margin-top:14px;}
+  /* Stap 1: twee kolommen (links maten, rechts standaardpakket) */
+  .ssc-step1-cols{display:flex;gap:18px;align-items:flex-start;}
+  .ssc-step1-left{flex:1 1 52%;min-width:0;}
+  .ssc-step1-right{flex:1 1 48%;min-width:0;}
+  .ssc-sizelist{display:flex;flex-direction:column;gap:10px;}
+  .ssc-sizelist .ssc-opt{padding:14px 16px;}
+  .ssc-package{background:#faf8f3;border:1px solid var(--c-border);border-radius:var(--radius);padding:16px 18px;position:sticky;top:10px;}
+  .pkg-title{font-weight:700;color:var(--c-ink);margin-bottom:4px;}
+  .pkg-name{font-size:.9rem;color:var(--c-muted);font-weight:600;margin-bottom:10px;}
+  .pkg-ln{display:flex;justify-content:space-between;gap:12px;font-size:.86rem;padding:7px 0;border-bottom:1px dashed var(--c-border);}
+  .pkg-ln span:first-child{color:var(--c-text);}
+  .pkg-ln .v{white-space:nowrap;color:var(--c-text);font-weight:600;}
+  .pkg-sub{display:flex;justify-content:space-between;gap:12px;margin-top:10px;padding-top:11px;border-top:2px solid var(--c-border);font-weight:800;color:var(--c-primary-d);font-size:.95rem;}
+  .pkg-foot{font-size:.74rem;color:var(--c-muted);margin-top:10px;}
+  .pkg-hint{font-size:.85rem;color:var(--c-muted);padding:10px 0;}
+  @media(max-width:640px){
+    .ssc-step1-cols{flex-direction:column;}
+    .ssc-step1-right{width:100%;}
+    .ssc-package{position:static;}
+  }
+  @media(max-width:520px){
+    .ssc-calc{padding:12px;}
+    .ssc-card{padding:16px;}
+    .ssc-head h1{font-size:1.25rem;}
+    .ssc-nav{flex-direction:column-reverse;}
+    .ssc-btn{width:100%;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ======================= CALCULATOR (begin) ======================= -->
+<div class="ssc-calc" id="ssc">
+
+  <!-- Merk-header in huisstijl Sun Sauna & Poolworld -->
+  <div class="ssc-brand">
+    <div class="mark" aria-hidden="true"><span class="b1"></span><span class="b2"></span><span class="b3"></span></div>
+    <div class="txt">
+      <span class="name">SUN SAUNA &amp; POOLWORLD</span>
+      <span class="tag">ZWEMBADEN &amp; WELLNESS</span>
+    </div>
+  </div>
+
+  <div class="ssc-card">
+
+    <div class="ssc-head">
+      <h1>Bereken je zwembad-prijsindicatie</h1>
+      <p>Stel je bouwkundige zwembad samen en ontvang vrijblijvend een geschatte prijs.</p>
+    </div>
+
+    <!-- Voortgang -->
+    <div class="ssc-steps" id="ssc-steps">
+      <div class="s active"></div><div class="s"></div><div class="s"></div>
+    </div>
+    <div class="ssc-stepname" id="ssc-stepname">Stap 1 van 3 — Kies je zwembad</div>
+
+    <!-- ============ STAP 1: MAAT ============ -->
+    <section class="ssc-step" data-step="1">
+      <h3>Welk formaat zwembad past bij jou?</h3>
+      <p class="ssc-stepname" style="text-align:left;margin-bottom:12px;">Alle prijzen zijn indicatief en incl. BTW, excl. grondwerk.</p>
+
+      <div class="ssc-step1-cols">
+        <!-- Linkerkolom: maten onder elkaar (groot → klein), maatwerk onderaan -->
+        <div class="ssc-step1-left">
+          <div class="ssc-sizelist" id="ssc-sizes"><!-- maatkaarten via JS --></div>
+
+          <!-- Maatwerk: afmetingen invullen (alleen zichtbaar na keuze "Andere maat?") -->
+          <div class="ssc-custom ssc-hide" id="ssc-custom">
+        <h3 style="margin-top:20px;">Wat zijn de gewenste afmetingen?</h3>
+        <p class="ssc-stepname" style="text-align:left;margin-bottom:12px;">We maken een indicatie op basis van de standaardmaat die het best bij jouw afmetingen past.</p>
+        <div class="ssc-row">
+          <div class="ssc-field" id="f-clen">
+            <label>Lengte (m) <span class="req">*</span></label>
+            <input type="number" id="in-clen" min="1" max="40" step="0.1" inputmode="decimal" placeholder="bijv. 9">
+            <div class="err">Vul een geldige lengte in.</div>
+          </div>
+          <div class="ssc-field" id="f-cwid">
+            <label>Breedte (m) <span class="req">*</span></label>
+            <input type="number" id="in-cwid" min="1" max="40" step="0.1" inputmode="decimal" placeholder="bijv. 4">
+            <div class="err">Vul een geldige breedte in.</div>
+          </div>
+          <div class="ssc-field" id="f-cdep">
+            <label>Diepte (m) <span class="req">*</span></label>
+            <input type="number" id="in-cdep" min="0.8" max="4" step="0.1" inputmode="decimal" value="1.5" placeholder="1.5">
+            <div class="err">Vul een geldige diepte in.</div>
+          </div>
+        </div>
+          </div>
+        </div><!-- /ssc-step1-left -->
+
+        <!-- Rechterkolom: onderdelen van het standaardpakket + prijzen (bij gekozen maat) -->
+        <aside class="ssc-step1-right">
+          <div class="ssc-package" id="ssc-package">
+            <div class="pkg-title">Inbegrepen in het standaardpakket</div>
+            <div class="pkg-name" id="ssc-package-name">Dit zit standaard bij elk bouwkundig zwembad</div>
+            <div id="ssc-package-lines"><!-- onderdelen via JS --></div>
+            <div class="pkg-foot">Je vrijblijvende prijsindicatie zie je na het invullen van je gegevens.</div>
+          </div>
+        </aside>
+      </div><!-- /ssc-step1-cols -->
+    </section>
+
+    <!-- ============ STAP 2: OPTIES ============ -->
+    <section class="ssc-step ssc-hide" data-step="2">
+      <h3>Stel je zwembad samen</h3>
+      <p class="ssc-stepname" style="text-align:left;margin-bottom:14px;">Alle opties zijn vrijblijvend. De standaardkeuze is al goed — pas aan wat je wilt. Een bedrag met “+” is de <b>meerprijs bovenop het standaardpakket</b>; je betaalt alleen het verschil.</p>
+      <div id="ssc-options"><!-- optiegroepen via JS --></div>
+    </section>
+
+    <!-- ============ STAP 3: CONTACTGEGEVENS ============ -->
+    <section class="ssc-step ssc-hide" data-step="3">
+      <h3>Ontvang je prijsindicatie</h3>
+      <p class="ssc-stepname" style="text-align:left;margin-bottom:14px;">Bijna klaar — waar mogen we je vrijblijvende prijsindicatie naartoe sturen?</p>
+
+      <div class="ssc-teaser" id="ssc-teaser">
+        <div class="big" style="font-size:1.05rem;">Je vrijblijvende prijsindicatie staat klaar</div>
+        <div class="small">Vul je gegevens in en bekijk direct je geschatte prijs.</div>
+      </div>
+
+      <div class="ssc-row">
+        <div class="ssc-field" id="f-name">
+          <label>Naam <span class="req">*</span></label>
+          <input type="text" id="in-name" autocomplete="name" placeholder="Voor- en achternaam">
+          <div class="err">Vul je naam in.</div>
+        </div>
+      </div>
+      <div class="ssc-row">
+        <div class="ssc-field" id="f-email">
+          <label>E-mailadres <span class="req">*</span></label>
+          <input type="email" id="in-email" autocomplete="email" placeholder="naam@voorbeeld.nl">
+          <div class="err">Vul een geldig e-mailadres in.</div>
+        </div>
+        <div class="ssc-field" id="f-phone">
+          <label>Telefoonnummer <span class="req">*</span></label>
+          <input type="tel" id="in-phone" autocomplete="tel" placeholder="06 12345678">
+          <div class="err">Vul een geldig telefoonnummer in.</div>
+        </div>
+      </div>
+      <div class="ssc-row">
+        <div class="ssc-field" id="f-company">
+          <label>Bedrijfsnaam <span style="color:var(--c-muted);font-weight:400;">(optioneel)</span></label>
+          <input type="text" id="in-company" autocomplete="organization" placeholder="Bedrijfsnaam">
+        </div>
+        <div class="ssc-field" id="f-city">
+          <label>Woonplaats <span style="color:var(--c-muted);font-weight:400;">(optioneel)</span></label>
+          <input type="text" id="in-city" autocomplete="address-level2" placeholder="Bijv. Reuver">
+        </div>
+      </div>
+      <div class="ssc-field" id="f-timeline">
+        <label>Wanneer mag het bouwproject starten? <span class="req">*</span></label>
+        <select id="in-timeline">
+          <option value="">Maak een keuze…</option>
+          <option value="1-3 maanden">1–3 maanden</option>
+          <option value="3-6 maanden">3–6 maanden</option>
+          <option value="6-12 maanden">6–12 maanden</option>
+          <option value="12+ maanden">12+ maanden</option>
+        </select>
+        <div class="err">Maak een keuze.</div>
+      </div>
+      <div class="ssc-field" id="f-message">
+        <label>Bericht of extra wensen <span style="color:var(--c-muted);font-weight:400;">(optioneel)</span></label>
+        <textarea id="in-message" rows="3" placeholder="Bijv. gewenste startdatum of vragen"></textarea>
+      </div>
+      <div class="ssc-field" id="f-consent">
+        <label class="ssc-consent">
+          <input type="checkbox" id="in-consent">
+          <span>Ik ga ermee akkoord dat Sun Sauna &amp; Poolworld contact met mij opneemt over mijn aanvraag.
+          <a href="#" target="_blank" rel="noopener">Bekijk ons privacybeleid</a>.</span>
+        </label>
+        <div class="err" style="margin-top:6px;">Vink dit aan om verder te gaan.</div>
+      </div>
+    </section>
+
+    <!-- ============ STAP 4: RESULTAAT ============ -->
+    <section class="ssc-step ssc-result ssc-hide" data-step="4">
+      <div class="ssc-success" id="ssc-success">Bedankt! Je aanvraag is verzonden. Ons team neemt zo snel mogelijk contact met je op.</div>
+      <h3>Jouw indicatieve prijs</h3>
+      <div class="total-box">
+        <div class="lbl">Indicatieve totaalprijs (incl. BTW)</div>
+        <div class="amt" id="ssc-total">—</div>
+      </div>
+      <div class="ssc-lines" id="ssc-breakdown"><!-- regels via JS --></div>
+      <div class="ssc-note">Let op: grondwerk is niet inbegrepen. Dit wordt bepaald na een opname op locatie.</div>
+      <p class="ssc-disclaimer">
+        Dit is een indicatieve schatting op basis van de door jou verstrekte informatie.
+        De definitieve prijs kan afwijken na beoordeling door ons team. Aan deze prijsindicatie kunnen geen rechten worden ontleend.
+      </p>
+      <div class="ssc-cta">
+        <a class="ssc-btn accent block" id="ssc-cta-quote" href="#" style="text-align:center;text-decoration:none;">Officiële offerte aanvragen</a>
+        <a class="ssc-btn ghost block" id="ssc-cta-call" href="#" style="text-align:center;text-decoration:none;">Vraag een terugbelverzoek aan</a>
+      </div>
+    </section>
+
+    <!-- Navigatie -->
+    <div class="ssc-nav" id="ssc-nav">
+      <button class="ssc-btn ghost" id="ssc-back" type="button">Vorige</button>
+      <button class="ssc-btn primary" id="ssc-next" type="button" disabled>Volgende</button>
+    </div>
+
+    <div class="ssc-foot">Vrijblijvend &amp; gratis · Geen definitieve offerte · Je gegevens worden alleen gebruikt voor je aanvraag.</div>
+  </div>
+</div>
+<!-- ======================= CALCULATOR (einde) ======================= -->
+
+<!-- Supabase-bibliotheek: MOET vóór het hoofdscript geladen worden, anders is `supabase` nog niet beschikbaar. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============================================================
+     ===== CONFIG: PRIJZEN AANPASSEN =====
+     Alle bedragen in euro's, INCL. BTW, conform de bevestigde prijslijst.
+     Volgorde van de 5 maten (index 0..4) is overal hetzelfde:
+       0 = 5 x 2,50 x 1,50 m
+       1 = 6 x 3 x 1,5 m
+       2 = 7 x 3,5 x 1,5 m
+       3 = 8 x 4 x 1,5 m
+       4 = 10 x 5 x 1,5 m
+     ============================================================ */
+
+  var BTW_TARIEF = 0.21;   // BTW-tarief (21%). Prijzen zijn INCL. BTW; dit dient alleen om het BTW-bedrag uit te splitsen.
+
+  // Maten + basisprijs (compleet standaardpakket incl. BTW, excl. grondwerk).
+  // m3 = waterinhoud (L×B×D); wordt gebruikt om een maatwerk-maat aan een standaardmaat te koppelen.
+  var SIZES = [
+    { id:"s1", label:"5 × 2,50 × 1,50 m", vol:"± 19 m³", m3:18.75, base:28415 },
+    { id:"s2", label:"6 × 3 × 1,5 m",     vol:"± 27 m³", m3:27,    base:31348 },
+    { id:"s3", label:"7 × 3,5 × 1,5 m",   vol:"± 37 m³", m3:36.75, base:34553.50 },
+    { id:"s4", label:"8 × 4 × 1,5 m",     vol:"± 48 m³", m3:48,    base:40189.50 },
+    { id:"s5", label:"10 × 5 × 1,5 m",    vol:"± 75 m³", m3:75,    base:48076 }
+  ];
+
+  // Onderdelen van het STANDAARDPAKKET met prijzen per maat (index 0..4), incl. BTW.
+  // De som per maat is gelijk aan SIZES[i].base. Pas hier de onderdeel-prijzen aan.
+  var STD_PACKAGE = [
+    { nm:"Gewapende betonvloer (incl. montage)",            prices:[2895,3495,3925,4275,5445] },
+    { nm:"Geïsoleerde XXL bouwblokken wanden (incl. beton)",prices:[7435,8415,9320,10575,12471] },
+    { nm:"Inbouwdelen (skimmers, inspuiters, bodemput)",    prices:[1050,1050,1050,1680,1680] },
+    { nm:"Zwembadfolie + ondervlies (1,5 mm, wit)",         prices:[3595,4480,5469,6675,9120] },
+    { nm:"LED-verlichting (wit)",                           prices:[650,650,650,1250,1250] },
+    { nm:"Schakelkast incl. trafo + tijdklok",              prices:[895,895,895,895,895] },
+    { nm:"Zandfilter + zwembadpomp",                        prices:[900,900,900,1100,1100] },
+    { nm:"PVC leidingwerk (binnen 10 m, incl. montage)",    prices:[2625,2625,2625,2835,2925] },
+    { nm:"Randstenen (wit of grijs) — stelpost",            prices:[2475,2708,3139.5,3549.5,4345] },
+    { nm:"Inbouwtrap (standaard inlooptrap)",               prices:[2000,2000,2000,2000,2000] },
+    { nm:"Zomerafdekking (oprolbaar, incl. oproller)",      prices:[1365,1600,1850,2175,3200] },
+    { nm:"Warmtepomp (Poollex Full Inverter)",              prices:[2045,2045,2245,2695,3145] },
+    { nm:"Start schoonmaakpakket",                          prices:[165,165,165,165,180] },
+    { nm:"Chemiepakket",                                    prices:[320,320,320,320,320] }
+  ];
+
+  /* Optiegroepen. Per optie een prijs-array met 5 waarden (per maat).
+     "type":
+        - "single"  = keuze uit één (radio). Eerste optie is meestal de standaard (prijs 0 = inbegrepen).
+        - "multi"   = meerdere tegelijk mogelijk (checkbox).
+     Een prijs van 0 betekent: zit al in het basispakket (inbegrepen).            */
+  var GROUPS = [
+    {
+      key:"trap", label:"Trap", type:"single",
+      options:[
+        { id:"standaard", nm:"Standaardtrap", ds:"Kleine schuine of rechte inlooptrap (inbegrepen)", prices:[0,0,0,0,0] },
+        { id:"plateau",   nm:"Trap met plateau / ligbank", ds:"Inlooptrap met plateau of uitbouwtrap met ligbank", prices:[495,525,595,795,995] },
+        { id:"breedte",   nm:"Trap over de hele breedte", ds:"Brede inlooptrap over de volledige breedte", prices:[695,725,795,995,1250] }
+      ]
+    },
+    {
+      key:"verlichting", label:"Verlichting", type:"single",
+      options:[
+        { id:"wit",   nm:"Witte LED-verlichting", ds:"Standaard witte LED (inbegrepen)", prices:[0,0,0,0,0] },
+        { id:"kleur", nm:"Kleuren-LED + afstandsbediening", ds:"Upgrade naar kleurverlichting met afstandsbediening", prices:[250,250,250,500,500] }
+      ]
+    },
+    {
+      key:"filter", label:"Filter &amp; pomp", type:"single",
+      options:[
+        { id:"standaard", nm:"Standaard zandfilter", ds:"Zandfilter met standaardpomp (inbegrepen)", prices:[0,0,0,0,0] },
+        { id:"polyester", nm:"Polyester filter + variabele pomp", ds:"Energiezuinige Pentair variabele pomp (tot 60% zuiniger). De getoonde meerprijs is alléén het verschil t.o.v. de standaard zandfilter — je betaalt dus niet voor beide.", prices:[1750,1750,1750,1650,1650] }
+      ]
+    },
+    {
+      key:"water", label:"Automatische waterbehandeling", type:"multi",
+      hint:"Meerdere opties tegelijk mogelijk.",
+      // Onderling uitsluitend:
+      //  - pH-apparaat OF chloor+pH-apparaat (beide regelen pH).
+      //  - zoutelektrolyse OF chloor+pH-apparaat (beide regelen chloor).
+      // Combinatie zout + pH blijft wél mogelijk.
+      exclusiveSets:[ ["ph","chloorph"], ["zout","chloorph"] ],
+      options:[
+        { id:"zout",     nm:"Zoutelektrolyse (Low Salt)", ds:"Incl. besturingskast, zout, sondes en montage", prices:[2985,2985,3050,3050,4225] },
+        { id:"ph",       nm:"pH meet- &amp; doseerapparaat", ds:"Incl. sonde en montage", prices:[950,950,950,950,950] },
+        { id:"chloorph", nm:"Chloor- &amp; pH doseerapparaat (EPS ONE)", ds:"Automatische chloor- en pH-dosering", prices:[2540,2540,2540,2540,2540] }
+      ]
+    },
+    {
+      key:"afdekking", label:"Lamellenafdekking", type:"single",
+      hint:"Komt bovenop de inbegrepen zomerafdekking.",
+      options:[
+        { id:"geen",        nm:"Geen lamellenafdekking", ds:"Alleen de inbegrepen zomerafdekking", prices:[0,0,0,0,0] },
+        { id:"opbouw_wit",  nm:"Lamellen opbouw — wit", ds:"Elektrisch, witte lamellen, incl. montage", prices:[5750,5995,6750,7599,9600] },
+        { id:"opbouw_solar",nm:"Lamellen opbouw — solar", ds:"Elektrisch, polycarbonaat solar lamellen", prices:[7350,7600,8995,10400,13995] },
+        { id:"inbouw_wit",  nm:"Lamellen inbouw — wit", ds:"Inbouw met buismotor, witte lamellen", prices:[9750,9995,10750,11550,13500] },
+        { id:"inbouw_solar",nm:"Lamellen inbouw — solar", ds:"Inbouw met buismotor, solar lamellen", prices:[11300,11550,12300,14400,17900] }
+      ]
+    },
+    {
+      key:"extra", label:"Extra opties", type:"multi",
+      options:[
+        { id:"winter",     nm:"Winterafdekking", ds:"PVC winterzeil incl. spanbanden en haringen", prices:[600,875,1000,1375,1975] },
+        { id:"verlenging", nm:"Zwembad +75 cm langer", ds:"Verlenging met 75 cm (extra folie, beton, rollers)", prices:[2375,3000,3500,4125,4750] }
+      ]
+    }
+  ];
+
+  // ===== Supabase-verbinding =====
+  // API-URL van het project (NIET de dashboard-link).
+  var SUPABASE_URL = "https://bbnpeuauoclodhrwalpx.supabase.co";
+  // Publieke "publishable" key — veilig om in de browser te gebruiken (alleen INSERT toegestaan via RLS).
+  var SUPABASE_ANON_KEY = "sb_publishable_rhLLWAehcXRq0eTlGfVD-Q_lWAgtWBE";
+
+  var supabaseClient = supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
+  );
+
+  // CTA-links (pas aan naar de juiste pagina's/acties).
+  var CTA_QUOTE_URL = "https://sspw.nl/contact/";   // "Officiële offerte aanvragen"
+  var CTA_CALL_URL  = "https://sspw.nl/contact/";   // "Vraag een terugbelverzoek aan"
+  /* ============================================================
+     ===== EINDE CONFIG =====
+     ============================================================ */
+
+
+  // ---------- Hulpfuncties ----------
+  function euro(n){
+    return "€ " + n.toLocaleString("nl-NL",{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
+  function euro0(n){
+    return "€ " + Math.round(n).toLocaleString("nl-NL");
+  }
+  var $ = function(id){ return document.getElementById(id); };
+
+  // ---------- State ----------
+  var state = {
+    step:1,
+    submitted:false,
+    sizeIndex:null,        // 0..4 na keuze (ook bij maatwerk dat aan een standaardmaat is gekoppeld)
+    isCustom:false,        // bezoeker koos "Andere maat?"
+    customDims:null,       // {l,w,d,vol,area}
+    customVol:null,        // volume in m³ (L×B×D) -> basis voor de prijsschatting
+    customOverflow:false,  // maat buiten redelijke schattingsmarge -> maatwerk-lead zonder prijs
+    // gekozen single-opties (key -> optionId), multi-opties (key -> {optionId:true})
+    single:{ trap:"standaard", verlichting:"wit", filter:"standaard", afdekking:"geen" },
+    multi:{ water:{}, extra:{} }
+  };
+
+  // Waterinhoud (m³) en basisprijzen van de 5 standaardmaten.
+  // De prijsschatting voor een afwijkende maat is gebaseerd op het VOLUME (L×B×D),
+  // zodat een dieper bad evenredig meeschaalt in prijs.
+  var STD_VOL  = SIZES.map(function(s){ return s.m3; });   // [18.75, 27, 36.75, 48, 75]
+  var STD_BASE = SIZES.map(function(s){ return s.base; });
+
+  // Stuksgewijs-lineaire schatting op basis van volume (m³): interpoleert tussen de
+  // standaardmaten en extrapoleert daarbuiten. Bij een volume gelijk aan een
+  // standaardmaat komt er EXACT de standaardprijs uit (geen verzonnen sprongen).
+  function interpBySize(vol, vals){
+    var V = STD_VOL;
+    if(vol <= V[0]){
+      var s0 = (vals[1]-vals[0])/(V[1]-V[0]);
+      return vals[0] + s0*(vol - V[0]);
+    }
+    for(var k=0;k<V.length-1;k++){
+      if(vol <= V[k+1]){
+        var s = (vals[k+1]-vals[k])/(V[k+1]-V[k]);
+        return vals[k] + s*(vol - V[k]);
+      }
+    }
+    var n = V.length-1;
+    var se = (vals[n]-vals[n-1])/(V[n]-V[n-1]);
+    return vals[n] + se*(vol - V[n]);
+  }
+
+  // Prijs van een waarden-array: bij een standaardmaat de exacte kolom, bij maatwerk de volume-schatting.
+  function priceOf(vals){
+    if(state.isCustom){ return Math.round(interpBySize(state.customVol, vals)); }
+    return vals[state.sizeIndex] || 0;
+  }
+
+  // Leesbare maat-omschrijving voor weergave en lead-payload.
+  function sizeLabel(){
+    if(state.isCustom && state.customDims){
+      var c = state.customDims; return c.l+" × "+c.w+" × "+c.d+" m";
+    }
+    return (typeof state.sizeIndex==="number") ? SIZES[state.sizeIndex].label : "";
+  }
+
+  // ---------- Render: maatkaarten ----------
+  (function renderSizes(){
+    var wrap = $("ssc-sizes"), html="";
+    // Maten van groot naar klein (boven naar onder); zonder prijs op de kaart.
+    for(var i=SIZES.length-1; i>=0; i--){
+      var s = SIZES[i];
+      html += '<label class="ssc-opt" data-i="'+i+'">'
+            +   '<input type="radio" name="ssc-size" value="'+i+'">'
+            +   '<div class="t">'+s.label+'</div>'
+            +   '<div class="sub">'+s.vol+' water</div>'
+            + '</label>';
+    }
+    // Maatwerk-kaart onderaan (geen prijs -> schatting/lead)
+    html += '<label class="ssc-opt" data-i="custom">'
+          +   '<div class="t">Andere maat?</div>'
+          +   '<div class="sub">Maatwerk of andere diepte</div>'
+          + '</label>';
+    wrap.innerHTML = html;
+
+    wrap.querySelectorAll(".ssc-opt").forEach(function(el){
+      el.addEventListener("click", function(){
+        var v = el.getAttribute("data-i");
+        wrap.querySelectorAll(".ssc-opt").forEach(function(o){o.classList.remove("sel");});
+        el.classList.add("sel");
+        if(v === "custom"){
+          state.isCustom = true;
+          state.customOverflow = false;
+          state.customVol = null;
+          state.sizeIndex = null;                       // wordt na de afmetingen bepaald
+          $("ssc-custom").classList.remove("ssc-hide");  // toon afmeting-velden
+        } else {
+          state.isCustom = false;
+          state.customOverflow = false;
+          state.customVol = null;
+          state.sizeIndex = parseInt(v,10);
+          $("ssc-custom").classList.add("ssc-hide");
+        }
+        $("ssc-next").disabled = false;
+        renderPackage();
+      });
+    });
+
+    // Live bijwerken van het standaardpakket-paneel terwijl maatwerk-afmetingen worden ingevuld.
+    ["in-clen","in-cwid","in-cdep"].forEach(function(id){
+      var el = $(id);
+      if(el){ el.addEventListener("input", function(){
+        if(!state.isCustom){ return; }
+        var l=parseFloat($("in-clen").value), w=parseFloat($("in-cwid").value), d=parseFloat($("in-cdep").value);
+        var valid = l>0 && l<=40 && w>0 && w<=40 && d>0 && d<=3;
+        state.customVol = valid ? (l*w*d) : null;
+        if(valid){ state.customDims = { l:l, w:w, d:d, vol:l*w*d, area:l*w }; }
+        renderPackage();
+      }); }
+    });
+  })();
+
+  // Rechterpaneel: toont ALLEEN welke onderdelen standaard inbegrepen zijn (zonder prijzen).
+  // De prijsindicatie verschijnt pas na het invullen van de contactgegevens.
+  function renderPackage(){
+    var wrap = $("ssc-package-lines");
+    wrap.innerHTML = STD_PACKAGE.map(function(c){
+      return '<div class="pkg-ln"><span>'+c.nm+'</span></div>';
+    }).join('');
+  }
+
+  // ---------- Render: optiegroepen ----------
+  (function renderOptions(){
+    var wrap = $("ssc-options"), html="";
+    GROUPS.forEach(function(g){
+      html += '<div class="ssc-group" data-group="'+g.key+'">';
+      html += '<span class="lbl">'+g.label+'</span>';
+      if(g.hint){ html += '<div class="ssc-stepname" style="text-align:left;margin:-4px 0 8px;">'+g.hint+'</div>'; }
+      g.options.forEach(function(o){
+        var inputType = (g.type==="single") ? "radio" : "checkbox";
+        html += '<label class="ssc-choice" data-group="'+g.key+'" data-opt="'+o.id+'">'
+              +   '<span class="c-l">'
+              +     '<input type="'+inputType+'" name="grp-'+g.key+'" value="'+o.id+'">'
+              +     '<span><span class="nm">'+o.nm+'</span><br><span class="ds">'+o.ds+'</span></span>'
+              +   '</span>'
+              +   '<span class="price" data-price-for="'+g.key+'_'+o.id+'"></span>'
+              + '</label>';
+      });
+      html += '</div>';
+    });
+    wrap.innerHTML = html;
+
+    // Standaardkeuzes voorselecteren (single)
+    GROUPS.forEach(function(g){
+      if(g.type==="single"){
+        var sel = state.single[g.key] || g.options[0].id;
+        state.single[g.key] = sel;
+      }
+    });
+
+    wrap.querySelectorAll(".ssc-choice").forEach(function(el){
+      el.addEventListener("click", function(){
+        var gk = el.getAttribute("data-group");
+        var oid = el.getAttribute("data-opt");
+        var grp = GROUPS.filter(function(x){return x.key===gk;})[0];
+        var input = el.querySelector("input");
+        if(grp.type==="single"){
+          state.single[gk] = oid;
+          input.checked = true;
+        } else {
+          input.checked = !input.checked;
+          if(input.checked){
+            state.multi[gk][oid] = true;
+            // Onderling uitsluitende opties uitzetten (bijv. pH vs. chloor+pH).
+            if(grp.exclusiveSets){
+              grp.exclusiveSets.forEach(function(set){
+                if(set.indexOf(oid) > -1){
+                  set.forEach(function(other){ if(other!==oid){ delete state.multi[gk][other]; } });
+                }
+              });
+            }
+          } else {
+            delete state.multi[gk][oid];
+          }
+        }
+        refreshOptionUI();
+      });
+    });
+
+    refreshOptionUI();
+  })();
+
+  // Werkt de prijslabels + geselecteerde stijl bij (afhankelijk van gekozen maat).
+  function refreshOptionUI(){
+    GROUPS.forEach(function(g){
+      g.options.forEach(function(o){
+        var priceEl = document.querySelector('[data-price-for="'+g.key+'_'+o.id+'"]');
+        var p = priceOf(o.prices);   // standaardmaat = exacte kolom, maatwerk = m²-schatting
+        if(priceEl){
+          if(p===0){ priceEl.textContent = "Inbegrepen"; priceEl.classList.add("incl"); }
+          else { priceEl.textContent = "+ "+euro0(p); priceEl.classList.remove("incl"); }
+        }
+        var choiceEl = document.querySelector('.ssc-choice[data-group="'+g.key+'"][data-opt="'+o.id+'"]');
+        if(!choiceEl) return;
+        var input = choiceEl.querySelector("input");
+        var on;
+        if(g.type==="single"){ on = (state.single[g.key]===o.id); }
+        else { on = !!state.multi[g.key][o.id]; }
+        input.checked = on;
+        choiceEl.classList.toggle("sel", on);
+      });
+    });
+
+    // ----- Voorwaardelijke optie -----
+    // Zwembadverlenging +75 cm is alleen mogelijk bij een INBOUW lamellenafdekking.
+    var inbouw = (state.single.afdekking==="inbouw_wit" || state.single.afdekking==="inbouw_solar");
+    var verlEl = document.querySelector('.ssc-choice[data-group="extra"][data-opt="verlenging"]');
+    if(verlEl){
+      verlEl.classList.toggle("ssc-hide", !inbouw);
+      if(!inbouw && state.multi.extra.verlenging){
+        delete state.multi.extra.verlenging;       // selectie verwijderen als niet meer van toepassing
+        var vi = verlEl.querySelector("input");
+        if(vi){ vi.checked = false; }
+        verlEl.classList.remove("sel");
+      }
+    }
+  }
+
+  // ---------- Prijsberekening ----------
+  function computeBreakdown(){
+    var lines = [];
+    var baseVal = state.isCustom ? priceOf(STD_BASE) : SIZES[state.sizeIndex].base;
+    var total = baseVal;
+    lines.push({ label:"Basispakket "+sizeLabel(), value:baseVal });
+
+    GROUPS.forEach(function(g){
+      if(g.type==="single"){
+        var oid = state.single[g.key];
+        var opt = g.options.filter(function(x){return x.id===oid;})[0];
+        var p = priceOf(opt.prices);
+        if(p>0){ lines.push({ label:opt.nm, value:p }); total += p; }
+      } else {
+        Object.keys(state.multi[g.key]).forEach(function(oid){
+          var opt = g.options.filter(function(x){return x.id===oid;})[0];
+          var p = priceOf(opt.prices);
+          if(p>0){ lines.push({ label:opt.nm, value:p }); total += p; }
+        });
+      }
+    });
+
+    var btw = total - (total/(1+BTW_TARIEF));   // BTW-deel binnen het incl.-bedrag
+    return { lines:lines, total:total, btw:btw };
+  }
+
+  // ---------- Validatie stap 3 ----------
+  function validEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
+  function validPhone(v){ var d=v.replace(/[^0-9]/g,""); return d.length>=8 && d.length<=15; }
+
+  function validateCustomDims(){
+    var ok = true;
+    function mark(fieldId, good){ var f=$(fieldId); f.classList.toggle("invalid",!good); if(!good) ok=false; }
+    var l = parseFloat($("in-clen").value);
+    var w = parseFloat($("in-cwid").value);
+    var d = parseFloat($("in-cdep").value);
+    mark("f-clen", l>0 && l<=40);
+    mark("f-cwid", w>0 && w<=40);
+    mark("f-cdep", d>0 && d<=4);
+    return ok ? { l:l, w:w, d:d } : null;
+  }
+
+  function validateContact(){
+    var ok = true;
+    function mark(fieldId, good){
+      var f = $(fieldId);
+      f.classList.toggle("invalid", !good);
+      if(!good) ok = false;
+    }
+    mark("f-name",  $("in-name").value.trim().length>=2);
+    mark("f-email", validEmail($("in-email").value.trim()));
+    mark("f-phone", validPhone($("in-phone").value.trim()));
+    mark("f-timeline", $("in-timeline").value !== "");
+    mark("f-consent", $("in-consent").checked);
+    return ok;
+  }
+
+  // ---------- Lead versturen ----------
+  function dimsText(){
+    if(!state.customDims) return "";
+    var c=state.customDims;
+    return c.l+" × "+c.w+" × "+c.d+" m (± "+ (Math.round(c.vol*10)/10) +" m³)";
+  }
+
+  function buildPayload(){
+    // Maatwerk-aanvraag te groot voor de prijslijst: geen prijs, alleen contact + melding.
+    if(state.customOverflow){
+      return {
+        name: $("in-name").value.trim(),
+        email: $("in-email").value.trim(),
+        phone: $("in-phone").value.trim(),
+        company: $("in-company").value.trim(),
+        city: $("in-city").value.trim(),
+        timeline: $("in-timeline").value,
+        message: $("in-message").value.trim(),
+        selected_product: "Bouwkundig zwembad — maatwerk (groter dan standaard)",
+        selected_variant: "Maatwerk",
+        quantity: 1,
+        selected_options: [],
+        calculator_answers: { size:"Maatwerk", custom_dimensions: dimsText() },
+        subtotal: null, tax: null, tax_rate: BTW_TARIEF, estimated_total: null,
+        currency: "EUR",
+        note: "Maatwerkaanvraag groter dan de grootste standaardmaat — zonder indicatieprijs, handmatig opvolgen.",
+        consent: $("in-consent").checked,
+        submitted_at: new Date().toISOString(),
+        page_url: (window.location && window.location.href) ? window.location.href : ""
+      };
+    }
+    var b = computeBreakdown();
+    // Verzamel gekozen opties leesbaar
+    var chosen = [];
+    GROUPS.forEach(function(g){
+      if(g.type==="single"){
+        var opt = g.options.filter(function(x){return x.id===state.single[g.key];})[0];
+        if(opt && priceOf(opt.prices) > 0){ chosen.push(g.label+": "+opt.nm); }
+      } else {
+        Object.keys(state.multi[g.key]).forEach(function(oid){
+          var opt = g.options.filter(function(x){return x.id===oid;})[0];
+          if(opt){ chosen.push(g.label+": "+opt.nm); }
+        });
+      }
+    });
+    return {
+      name: $("in-name").value.trim(),
+      email: $("in-email").value.trim(),
+      phone: $("in-phone").value.trim(),
+      company: $("in-company").value.trim(),
+      city: $("in-city").value.trim(),
+      timeline: $("in-timeline").value,
+      message: $("in-message").value.trim(),
+      selected_product: state.isCustom ? "Bouwkundig zwembad — maatwerk (volume-schatting o.b.v. standaardmaten)" : ("Bouwkundig zwembad "+sizeLabel()),
+      selected_variant: state.isCustom ? ("Maatwerk "+sizeLabel()) : sizeLabel(),
+      quantity: 1,
+      selected_options: chosen,
+      calculator_answers: { size:sizeLabel(), custom_dimensions: state.isCustom ? dimsText() : null, single:state.single, multi:state.multi },
+      subtotal: Math.round(b.total*100)/100,
+      tax: Math.round(b.btw*100)/100,
+      tax_rate: BTW_TARIEF,
+      estimated_total: Math.round(b.total*100)/100,
+      estimate_low: Math.floor(b.total*0.95/50)*50,
+      estimate_high: Math.ceil(b.total*1.05/50)*50,
+      estimate_margin: 0.05,
+      currency: "EUR",
+      note: "Indicatieve prijs incl. BTW, excl. grondwerk.",
+      consent: $("in-consent").checked,
+      submitted_at: new Date().toISOString(),
+      page_url: (window.location && window.location.href) ? window.location.href : ""
+    };
+  }
+
+  async function sendLead(payload){
+  var result = await supabaseClient
+    .from("calculator_leads")
+    .insert([payload]);
+
+  if(result.error){
+    console.error("Supabase fout:", result.error);
+    throw new Error("De aanvraag kon niet worden opgeslagen.");
+  }
+
+  return result.data;
+}
+
+  // ---------- Resultaat tonen ----------
+  function renderResult(){
+    // Maatwerk groter dan standaard: geen prijs tonen, alleen bevestiging + CTA.
+    if(state.customOverflow){
+      $("ssc-success").textContent = "Bedankt! We hebben je maatwerkaanvraag ontvangen. Ons team neemt contact met je op voor een prijs op maat.";
+      document.querySelector('.ssc-result .total-box').classList.add("ssc-hide");
+      $("ssc-breakdown").innerHTML = '<div class="ln"><span>Je gewenste afmetingen ('+dimsText()+') vallen buiten onze standaardmaten. We maken een persoonlijke berekening en nemen contact met je op.</span></div>';
+      $("ssc-cta-quote").setAttribute("href", CTA_QUOTE_URL);
+      $("ssc-cta-call").setAttribute("href", CTA_CALL_URL);
+      return;
+    }
+    document.querySelector('.ssc-result .total-box').classList.remove("ssc-hide");
+    var b = computeBreakdown();
+    // Eindschatting met 5% marge, getoond als bandbreedte (afgerond op € 50).
+    var low  = Math.floor(b.total*0.95/50)*50;
+    var high = Math.ceil(b.total*1.05/50)*50;
+    $("ssc-total").textContent = euro0(low)+" – "+euro0(high);
+    var html="";
+    // Bij maatwerk: leg uit dat de prijs een schatting is op basis van het volume van de standaardmaten.
+    if(state.isCustom){
+      html += '<div class="ln" style="background:#faf6ea;"><span>Geschatte prijs voor jouw afmetingen ('+dimsText()+'), berekend op basis van de prijs per m³ (inhoud) van onze standaardmaten.</span></div>';
+    }
+    b.lines.forEach(function(l){
+      html += '<div class="ln"><span>'+l.label+'</span><span class="v">'+euro(l.value)+'</span></div>';
+    });
+    html += '<div class="ln"><span>waarvan '+Math.round(BTW_TARIEF*100)+'% BTW</span><span class="v">'+euro(b.btw)+'</span></div>';
+    html += '<div class="ln sub"><span>Indicatieve prijs (incl. BTW, ± 5% marge)</span><span class="v">'+euro0(low)+' – '+euro0(high)+'</span></div>';
+    $("ssc-breakdown").innerHTML = html;
+    $("ssc-cta-quote").setAttribute("href", CTA_QUOTE_URL);
+    $("ssc-cta-call").setAttribute("href", CTA_CALL_URL);
+  }
+
+  // ---------- Stap-navigatie ----------
+  function showStep(n){
+    state.step = n;
+    document.querySelectorAll(".ssc-step").forEach(function(sec){
+      sec.classList.toggle("ssc-hide", parseInt(sec.getAttribute("data-step"),10)!==n);
+    });
+    // voortgangsbalk (3 stappen + resultaat)
+    var bars = $("ssc-steps").children;
+    var names = ["", "Stap 1 van 3 — Kies je zwembad", "Stap 2 van 3 — Stel je zwembad samen", "Stap 3 van 3 — Jouw gegevens", "Klaar — jouw prijsindicatie"];
+    for(var k=0;k<bars.length;k++){
+      bars[k].className = "s" + (k < Math.min(n,3) ? (k < n-1 ? " done" : " active") : "");
+    }
+    if(n>=4){ for(var j=0;j<bars.length;j++){ bars[j].className="s done"; } }
+    $("ssc-stepname").textContent = names[n] || "";
+
+    // knoppen
+    var back = $("ssc-back"), next = $("ssc-next"), nav = $("ssc-nav");
+    nav.classList.remove("ssc-hide");
+    back.classList.toggle("ssc-hide", n===1 || n===4);
+    if(n===4){ nav.classList.add("ssc-hide"); }
+    if(n===1){ next.textContent="Volgende"; next.disabled = !(state.isCustom || typeof state.sizeIndex==="number"); }
+    if(n===2){ next.textContent="Volgende"; next.disabled = false; }
+    if(n===3){
+      if(state.customOverflow){
+        next.textContent="Verstuur mijn aanvraag";
+        $("ssc-teaser").classList.add("ssc-hide");
+      } else {
+        next.textContent="Toon mijn prijsindicatie";
+        $("ssc-teaser").classList.remove("ssc-hide");
+      }
+      next.disabled = false;
+    }
+
+    if(typeof window!=="undefined" && $("ssc").scrollIntoView){ $("ssc").scrollIntoView({behavior:"smooth", block:"start"}); }
+  }
+
+  $("ssc-next").addEventListener("click", function(){
+    if(state.step===1){
+      if(state.isCustom){
+        // Maatwerk: afmetingen valideren en een prijsschatting per m² maken.
+        var dims = validateCustomDims();
+        if(!dims) return;
+        var area = dims.l * dims.w;
+        var vol = area * dims.d;
+        state.customDims = { l:dims.l, w:dims.w, d:dims.d, vol:vol, area:area };
+        state.customVol = vol;
+        // Buiten redelijke schattingsmarge (te groot volume of erg diep) -> maatwerk-lead zonder prijs.
+        if(vol > 2*STD_VOL[STD_VOL.length-1] || dims.d > 3){
+          state.customOverflow = true;
+          showStep(3);
+          return;
+        }
+        refreshOptionUI();
+        showStep(2);
+        return;
+      }
+      if(state.sizeIndex===null) return;
+      refreshOptionUI();
+      showStep(2);
+    } else if(state.step===2){
+      showStep(3);
+   } else if(state.step===3){
+  if(!validateContact()) return;
+
+  var payload = buildPayload();
+
+  $("ssc-next").disabled = true;
+  $("ssc-next").textContent = "Aanvraag verzenden...";
+
+  sendLead(payload)
+    .then(function(){
+      state.submitted = true;
+      $("ssc-success").classList.remove("ssc-hide");
+      renderResult();
+      showStep(4);
+    })
+    .catch(function(error){
+      console.error(error);
+      alert("Er ging iets mis bij het verzenden van je aanvraag. Probeer het opnieuw of neem contact met ons op.");
+      $("ssc-next").disabled = false;
+
+      if(state.customOverflow){
+        $("ssc-next").textContent = "Verstuur mijn aanvraag";
+      } else {
+        $("ssc-next").textContent = "Toon mijn prijsindicatie";
+      }
+    });
+}
+  });
+
+  $("ssc-back").addEventListener("click", function(){
+    if(state.step===2) showStep(1);
+    else if(state.step===3){ showStep(state.customOverflow ? 1 : 2); }
+  });
+
+  // ---------- init ----------
+  renderPackage();
+  showStep(1);
+
+})();
+</script>
+</body>
+</html>
