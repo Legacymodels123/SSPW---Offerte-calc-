@@ -446,10 +446,9 @@
       ]
     },
     {
-      key:"afdekking", label:"Lamellenafdekking", type:"single",
-      hint:"Komt bovenop de inbegrepen zomerafdekking.",
+      key:"afdekking", label:"Lamellenafdekking", type:"single", optional:true,
+      hint:"Optioneel — komt bovenop de inbegrepen zomerafdekking. Kies een lamellenafdekking als je die wilt; nogmaals op je keuze klikken zet hem weer uit.",
       options:[
-        { id:"geen",        nm:"Geen lamellenafdekking", ds:"Alleen de inbegrepen zomerafdekking", prices:[0,0,0,0,0] },
         { id:"opbouw_wit",  nm:"Lamellen opbouw — wit", ds:"Elektrisch, witte lamellen, incl. montage", prices:[5750,5995,6750,7599,9600] },
         { id:"opbouw_solar",nm:"Lamellen opbouw — solar", ds:"Elektrisch, polycarbonaat solar lamellen", prices:[7350,7600,8995,10400,13995] },
         { id:"inbouw_wit",  nm:"Lamellen inbouw — wit", ds:"Inbouw met buismotor, witte lamellen", prices:[9750,9995,10750,11550,13500] },
@@ -503,7 +502,7 @@
     customVol:null,        // volume in m³ (L×B×D) -> basis voor de prijsschatting
     customOverflow:false,  // maat buiten redelijke schattingsmarge -> maatwerk-lead zonder prijs
     // gekozen single-opties (key -> optionId), multi-opties (key -> {optionId:true})
-    single:{ trap:"standaard", verlichting:"wit", filter:"standaard", afdekking:"geen" },
+    single:{ trap:"standaard", verlichting:"wit", filter:"standaard", afdekking:"" },
     multi:{ water:{}, extra:{} }
   };
 
@@ -635,7 +634,7 @@
 
     // Standaardkeuzes voorselecteren (single)
     GROUPS.forEach(function(g){
-      if(g.type==="single"){
+      if(g.type==="single" && !g.optional){
         var sel = state.single[g.key] || g.options[0].id;
         state.single[g.key] = sel;
       }
@@ -648,8 +647,14 @@
         var grp = GROUPS.filter(function(x){return x.key===gk;})[0];
         var input = el.querySelector("input");
         if(grp.type==="single"){
-          state.single[gk] = oid;
-          input.checked = true;
+          // Optionele single-groep (bijv. lamellenafdekking): nogmaals op de gekozen optie klikken zet de keuze weer uit.
+          if(grp.optional && state.single[gk]===oid){
+            state.single[gk] = "";
+            input.checked = false;
+          } else {
+            state.single[gk] = oid;
+            input.checked = true;
+          }
         } else {
           input.checked = !input.checked;
           if(input.checked){
@@ -720,6 +725,7 @@
       if(g.type==="single"){
         var oid = state.single[g.key];
         var opt = g.options.filter(function(x){return x.id===oid;})[0];
+        if(!opt){ return; }   // optionele groep zonder keuze (bijv. geen lamellenafdekking gekozen)
         var p = priceOf(opt.prices);
         if(p>0){ lines.push({ label:opt.nm, value:p }); total += p; }
       } else {
