@@ -425,7 +425,7 @@
       ]
     },
     {
-      key:"filter", label:"Filter &amp; pomp", type:"single",
+      key:"filter", label:"Filter & pomp", type:"single",
       options:[
         { id:"standaard", nm:"Standaard zandfilter", ds:"Zandfilter met standaardpomp (inbegrepen)", prices:[0,0,0,0,0] },
         { id:"polyester", nm:"Polyester filter + variabele pomp", ds:"Energiezuinige Pentair variabele pomp (tot 60% zuiniger). De getoonde meerprijs is alléén het verschil t.o.v. de standaard zandfilter — je betaalt dus niet voor beide.", prices:[1750,1750,1750,1650,1650] }
@@ -441,8 +441,8 @@
       exclusiveSets:[ ["ph","chloorph"], ["zout","chloorph"] ],
       options:[
         { id:"zout",     nm:"Zoutelektrolyse (Low Salt)", ds:"Incl. besturingskast, zout, sondes en montage", prices:[2985,2985,3050,3050,4225] },
-        { id:"ph",       nm:"pH meet- &amp; doseerapparaat", ds:"Incl. sonde en montage", prices:[950,950,950,950,950] },
-        { id:"chloorph", nm:"Chloor- &amp; pH doseerapparaat (EPS ONE)", ds:"Automatische chloor- en pH-dosering", prices:[2540,2540,2540,2540,2540] }
+        { id:"ph",       nm:"pH meet- & doseerapparaat", ds:"Incl. sonde en montage", prices:[950,950,950,950,950] },
+        { id:"chloorph", nm:"Chloor- & pH doseerapparaat (EPS ONE)", ds:"Automatische chloor- en pH-dosering", prices:[2540,2540,2540,2540,2540] }
       ]
     },
     {
@@ -467,9 +467,9 @@
 
   // ===== Supabase-verbinding =====
   // API-URL van het project (NIET de dashboard-link).
-  var SUPABASE_URL = "https://bbnpeuauoclodhrwalpx.supabase.co";
-  // Publieke "publishable" key — veilig om in de browser te gebruiken (alleen INSERT toegestaan via RLS).
-  var SUPABASE_ANON_KEY = "sb_publishable_rhLLWAehcXRq0eTlGfVD-Q_lWAgtWBE";
+  var SUPABASE_URL = "https://urqzkjqobjmwuasnlnxg.supabase.co";
+  // Publieke "publishable" key — veilig om in de browser te gebruiken (lezen prijzen + insert leads via RLS).
+  var SUPABASE_ANON_KEY = "sb_publishable_0SocbHcipoQMc88mKs8wnw_-kt29LUV";
 
   var supabaseClient = supabase.createClient(
     SUPABASE_URL,
@@ -492,6 +492,12 @@
     return "€ " + Math.round(n).toLocaleString("nl-NL");
   }
   var $ = function(id){ return document.getElementById(id); };
+  // Veilig tekst tonen in innerHTML (tekst kan uit de database komen).
+  function esc(s){
+    return String(s==null?"":s)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  }
 
   // ---------- State ----------
   var state = {
@@ -512,6 +518,11 @@
   // zodat een dieper bad evenredig meeschaalt in prijs.
   var STD_VOL  = SIZES.map(function(s){ return s.m3; });   // [18.75, 27, 36.75, 48, 75]
   var STD_BASE = SIZES.map(function(s){ return s.base; });
+  // Herbereken de hulparrays nadat de prijzen (eventueel) uit de database zijn geladen.
+  function recomputeStd(){
+    STD_VOL  = SIZES.map(function(s){ return s.m3; });
+    STD_BASE = SIZES.map(function(s){ return s.base; });
+  }
 
   // Stuksgewijs-lineaire schatting op basis van volume (m³): interpoleert tussen de
   // standaardmaten en extrapoleert daarbuiten. Bij een volume gelijk aan een
@@ -548,15 +559,15 @@
   }
 
   // ---------- Render: maatkaarten ----------
-  (function renderSizes(){
+  function renderSizes(){
     var wrap = $("ssc-sizes"), html="";
     // Maten van groot naar klein (boven naar onder); zonder prijs op de kaart.
     for(var i=SIZES.length-1; i>=0; i--){
       var s = SIZES[i];
       html += '<label class="ssc-opt" data-i="'+i+'">'
             +   '<input type="radio" name="ssc-size" value="'+i+'">'
-            +   '<div class="t">'+s.label+'</div>'
-            +   '<div class="sub">'+s.vol+' water</div>'
+            +   '<div class="t">'+esc(s.label)+'</div>'
+            +   '<div class="sub">'+esc(s.vol)+' water</div>'
             + '</label>';
     }
     // Maatwerk-kaart onderaan (geen prijs -> schatting/lead)
@@ -601,30 +612,30 @@
         renderPackage();
       }); }
     });
-  })();
+  }
 
   // Rechterpaneel: toont ALLEEN welke onderdelen standaard inbegrepen zijn (zonder prijzen).
   // De prijsindicatie verschijnt pas na het invullen van de contactgegevens.
   function renderPackage(){
     var wrap = $("ssc-package-lines");
     wrap.innerHTML = STD_PACKAGE.map(function(c){
-      return '<div class="pkg-ln"><span>'+c.nm+'</span></div>';
+      return '<div class="pkg-ln"><span>'+esc(c.nm)+'</span></div>';
     }).join('');
   }
 
   // ---------- Render: optiegroepen ----------
-  (function renderOptions(){
+  function renderOptions(){
     var wrap = $("ssc-options"), html="";
     GROUPS.forEach(function(g){
       html += '<div class="ssc-group" data-group="'+g.key+'">';
-      html += '<span class="lbl">'+g.label+'</span>';
-      if(g.hint){ html += '<div class="ssc-stepname" style="text-align:left;margin:-4px 0 8px;">'+g.hint+'</div>'; }
+      html += '<span class="lbl">'+esc(g.label)+'</span>';
+      if(g.hint){ html += '<div class="ssc-stepname" style="text-align:left;margin:-4px 0 8px;">'+esc(g.hint)+'</div>'; }
       g.options.forEach(function(o){
         var inputType = (g.type==="single") ? "radio" : "checkbox";
         html += '<label class="ssc-choice" data-group="'+g.key+'" data-opt="'+o.id+'">'
               +   '<span class="c-l">'
               +     '<input type="'+inputType+'" name="grp-'+g.key+'" value="'+o.id+'">'
-              +     '<span><span class="nm">'+o.nm+'</span><br><span class="ds">'+o.ds+'</span></span>'
+              +     '<span><span class="nm">'+esc(o.nm)+'</span><br><span class="ds">'+esc(o.ds)+'</span></span>'
               +   '</span>'
               +   '<span class="price" data-price-for="'+g.key+'_'+o.id+'"></span>'
               + '</label>';
@@ -671,7 +682,7 @@
     });
 
     refreshOptionUI();
-  })();
+  }
 
   // Werkt de prijslabels + geselecteerde stijl bij (afhankelijk van gekozen maat).
   function refreshOptionUI(){
@@ -876,7 +887,7 @@
       html += '<div class="ln" style="background:#faf6ea;"><span>Geschatte prijs voor jouw afmetingen ('+dimsText()+'), berekend op basis van de prijs per m³ (inhoud) van onze standaardmaten.</span></div>';
     }
     b.lines.forEach(function(l){
-      html += '<div class="ln"><span>'+l.label+'</span><span class="v">'+euro(l.value)+'</span></div>';
+      html += '<div class="ln"><span>'+esc(l.label)+'</span><span class="v">'+euro(l.value)+'</span></div>';
     });
     html += '<div class="ln"><span>waarvan '+Math.round(BTW_TARIEF*100)+'% BTW</span><span class="v">'+euro(b.btw)+'</span></div>';
     html += '<div class="ln sub"><span>Indicatieve prijs (incl. BTW, ± 5% marge)</span><span class="v">'+euro0(low)+' – '+euro0(high)+'</span></div>';
@@ -980,9 +991,59 @@
     else if(state.step===3){ showStep(state.customOverflow ? 1 : 2); }
   });
 
+  // ---------- Prijzen laden uit Supabase ----------
+  // Haalt maten, pakketonderdelen, opties en instellingen uit de database en
+  // overschrijft de ingebouwde standaardwaarden. Mislukt het laden, dan blijft
+  // de calculator gewoon werken met de hierboven ingebouwde prijzen (fallback).
+  async function loadPricing(){
+    try{
+      var q = await Promise.all([
+        supabaseClient.from("pricing_sizes").select("*").order("sort_order"),
+        supabaseClient.from("pricing_package_items").select("*").order("sort_order"),
+        supabaseClient.from("pricing_option_groups").select("*").order("sort_order"),
+        supabaseClient.from("pricing_options").select("*").order("sort_order"),
+        supabaseClient.from("settings").select("*")
+      ]);
+      for(var i=0;i<q.length;i++){ if(q[i].error){ throw q[i].error; } }
+      var dbSizes=q[0].data, dbItems=q[1].data, dbGroups=q[2].data, dbOptions=q[3].data, dbSettings=q[4].data;
+      // Niets bruikbaars terug? Dan vallen we terug op de ingebouwde prijzen.
+      if(!dbSizes || !dbSizes.length || !dbGroups || !dbGroups.length){ return; }
+
+      SIZES = dbSizes.map(function(s){
+        return { id:s.id, label:s.label, vol:s.vol_label, m3:Number(s.m3), base:Number(s.base_price) };
+      });
+      STD_PACKAGE = (dbItems||[]).map(function(it){
+        return { nm:it.name, prices:(it.prices||[]).map(Number) };
+      });
+      GROUPS = dbGroups.map(function(g){
+        return {
+          key:g.id, label:g.label, type:g.type,
+          hint:g.hint||undefined, optional:!!g.optional,
+          exclusiveSets:g.exclusive_sets||undefined,
+          options:(dbOptions||[])
+            .filter(function(o){ return o.group_id===g.id; })
+            .map(function(o){ return { id:o.option_key, nm:o.name, ds:o.description, prices:(o.prices||[]).map(Number) }; })
+        };
+      });
+      (dbSettings||[]).forEach(function(row){
+        if(row.key==="btw_tarief"){ var v=Number(row.value); if(!isNaN(v)){ BTW_TARIEF=v; } }
+        else if(row.key==="cta_quote_url" && row.value){ CTA_QUOTE_URL=String(row.value); }
+        else if(row.key==="cta_call_url"  && row.value){ CTA_CALL_URL =String(row.value); }
+      });
+    }catch(err){
+      console.warn("Prijzen laden uit Supabase mislukt — ingebouwde standaardprijzen worden gebruikt.", err);
+    }
+  }
+
   // ---------- init ----------
-  renderPackage();
-  showStep(1);
+  (async function init(){
+    await loadPricing();   // prijzen uit database (met fallback)
+    recomputeStd();        // hulparrays bijwerken
+    renderSizes();
+    renderOptions();
+    renderPackage();
+    showStep(1);
+  })();
 
 })();
 </script>
