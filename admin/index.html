@@ -140,6 +140,7 @@
               <option value="verloren">Verloren</option>
             </select>
             <button class="btn ghost sm" id="btn-refresh-leads">Vernieuwen</button>
+            <button class="btn primary sm" id="btn-export">Exporteer naar Excel</button>
           </div>
         </div>
         <div id="leads-table"></div>
@@ -270,6 +271,44 @@
   // ---------- Leads ----------
   $("btn-refresh-leads").addEventListener("click", loadLeads);
   $("leads-filter").addEventListener("change", renderLeads);
+  $("btn-export").addEventListener("click", exportLeads);
+
+  // Exporteert de (gefilterde) leads als CSV — opent rechtstreeks in Excel.
+  function exportLeads(){
+    var filter=$("leads-filter").value;
+    var rows = LEADS.filter(function(l){ return !filter || (l.status||"nieuw")===filter; });
+    if(!rows.length){ toast("Geen leads om te exporteren.",true); return; }
+    var cols = [
+      ["Datum", function(l){ return l.created_at? new Date(l.created_at).toLocaleString("nl-NL"):""; }],
+      ["Status", function(l){ return l.status||"nieuw"; }],
+      ["Naam", function(l){ return l.name; }],
+      ["E-mail", function(l){ return l.email; }],
+      ["Telefoon", function(l){ return l.phone; }],
+      ["Bedrijf", function(l){ return l.company; }],
+      ["Woonplaats", function(l){ return l.city; }],
+      ["Startmoment", function(l){ return l.timeline; }],
+      ["Product", function(l){ return l.selected_product; }],
+      ["Variant", function(l){ return l.selected_variant; }],
+      ["Gekozen opties", function(l){ return (l.selected_options||[]).join(" | "); }],
+      ["Indicatie totaal (incl. btw)", function(l){ return l.estimated_total!=null? String(l.estimated_total).replace(".",","):""; }],
+      ["Band laag", function(l){ return l.estimate_low!=null? String(l.estimate_low).replace(".",","):""; }],
+      ["Band hoog", function(l){ return l.estimate_high!=null? String(l.estimate_high).replace(".",","):""; }],
+      ["Maatwerk", function(l){ var ca=l.calculator_answers||{}; return ca.custom_dimensions||""; }],
+      ["Bericht", function(l){ return l.message; }],
+      ["Interne notities", function(l){ return l.internal_notes; }]
+    ];
+    function cell(v){ v = (v==null?"":String(v)).replace(/"/g,'""'); return '"'+v+'"'; }
+    var lines = [ cols.map(function(c){return cell(c[0]);}).join(";") ];
+    rows.forEach(function(l){ lines.push(cols.map(function(c){ return cell(c[1](l)); }).join(";")); });
+    // BOM zodat Excel UTF-8 (é, €, ×) correct toont; puntkomma = NL-Excel kolomscheiding.
+    var blob = new Blob(["﻿"+lines.join("\r\n")], {type:"text/csv;charset=utf-8;"});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href=url; a.download="sspw-leads-"+new Date().toISOString().slice(0,10)+".csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast(rows.length+" leads geëxporteerd.");
+  }
 
   async function loadLeads(){
     var r = await db.from("calculator_leads").select("*").order("created_at",{ascending:false});
