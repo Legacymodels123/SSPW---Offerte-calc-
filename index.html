@@ -835,7 +835,17 @@
       selected_variant: state.isCustom ? ("Maatwerk "+sizeLabel()) : sizeLabel(),
       quantity: 1,
       selected_options: chosen,
-      calculator_answers: { size:sizeLabel(), custom_dimensions: state.isCustom ? dimsText() : null, single:state.single, multi:state.multi },
+      calculator_answers: {
+        size:sizeLabel(),
+        custom_dimensions: state.isCustom ? dimsText() : null,
+        single:state.single, multi:state.multi,
+        is_custom: state.isCustom,
+        breakdown: b.lines.map(function(l){ return { label:l.label, value:Math.round(l.value*100)/100 }; }),
+        btw: Math.round(b.btw*100)/100,
+        total: Math.round(b.total*100)/100,
+        low: Math.floor(b.total*0.95/50)*50,
+        high: Math.ceil(b.total*1.05/50)*50
+      },
       subtotal: Math.round(b.total*100)/100,
       tax: Math.round(b.btw*100)/100,
       tax_rate: BTW_TARIEF,
