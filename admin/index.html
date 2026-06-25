@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SSPW Dashboard — Zwembadcalculator</title>
+<style>
+  :root{
+    --gold:#b8954f; --gold-d:#9c7c39; --ink:#2b2b2b; --black:#000;
+    --bg:#f4f4f5; --card:#fff; --muted:#6b6b6b; --border:#e3e3e3;
+    --ok:#2e7d32; --err:#c62828; --radius:12px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.5;}
+  a{color:var(--gold-d);}
+  .hide{display:none !important;}
+  .btn{appearance:none;border:none;border-radius:8px;padding:10px 16px;font-size:.95rem;font-weight:700;
+    cursor:pointer;font-family:inherit;transition:.15s;}
+  .btn.primary{background:var(--gold);color:#fff;} .btn.primary:hover{background:var(--gold-d);}
+  .btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--border);} .btn.ghost:hover{border-color:var(--gold);}
+  .btn.sm{padding:6px 10px;font-size:.85rem;}
+  .btn.danger{background:#fff;color:var(--err);border:1px solid #f1c4c4;} .btn.danger:hover{background:#fdecec;}
+  input,select,textarea{font-family:inherit;font-size:.95rem;padding:9px 10px;border:1px solid var(--border);
+    border-radius:8px;background:#fff;color:var(--ink);width:100%;}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(184,149,79,.2);}
+  label{font-weight:600;font-size:.88rem;display:block;margin-bottom:4px;}
+
+  /* Login */
+  .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .login-card{background:var(--card);border-radius:var(--radius);box-shadow:0 8px 30px rgba(0,0,0,.12);
+    padding:30px;width:100%;max-width:380px;}
+  .brand{display:flex;align-items:center;gap:12px;justify-content:center;margin-bottom:18px;}
+  .brand .mark{display:flex;gap:3px;align-items:flex-end;height:34px;}
+  .brand .mark span{display:block;width:6px;border-radius:1px;}
+  .brand .mark .b1{height:34px;background:var(--ink);}
+  .brand .mark .b2{height:19px;background:var(--ink);}
+  .brand .mark .b3{height:27px;background:var(--gold);}
+  .brand .name{font-weight:800;letter-spacing:.05em;font-size:.95rem;}
+  .brand .tag{font-size:.6rem;letter-spacing:.18em;color:var(--gold-d);}
+  .field{margin-bottom:14px;}
+  .msg{font-size:.88rem;margin-top:10px;padding:8px 10px;border-radius:8px;}
+  .msg.err{background:#fdecec;color:var(--err);}
+  .msg.ok{background:#e8f5e9;color:var(--ok);}
+
+  /* App */
+  header.top{background:var(--black);color:#fff;display:flex;align-items:center;justify-content:space-between;
+    padding:12px 20px;position:sticky;top:0;z-index:10;}
+  header.top .l{display:flex;align-items:center;gap:14px;}
+  header.top .brand .name{color:#fff;} header.top .brand .mark .b1,header.top .brand .mark .b2{background:#fff;}
+  header.top .who{font-size:.82rem;color:#cfcfcf;}
+  .tabs{display:flex;gap:6px;background:#fff;padding:0 20px;border-bottom:1px solid var(--border);position:sticky;top:58px;z-index:9;}
+  .tabs button{background:none;border:none;padding:14px 14px;font-size:.95rem;font-weight:700;color:var(--muted);
+    cursor:pointer;border-bottom:3px solid transparent;font-family:inherit;}
+  .tabs button.active{color:var(--ink);border-bottom-color:var(--gold);}
+  main{max-width:1100px;margin:0 auto;padding:22px 20px 60px;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:18px;}
+  .card h2{margin:0 0 4px;font-size:1.1rem;} .card .sub{color:var(--muted);font-size:.85rem;margin-bottom:14px;}
+  .row{display:flex;gap:12px;flex-wrap:wrap;}
+  .row .field{flex:1;min-width:160px;}
+  .toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+  .savebar{display:flex;align-items:center;gap:12px;margin-top:14px;}
+  table{width:100%;border-collapse:collapse;font-size:.9rem;}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
+  th{font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
+  td input{padding:7px 8px;}
+  .num{width:92px;} td.num-cell{width:100px;}
+  .price-grid input{text-align:right;}
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:.78rem;font-weight:700;}
+  .pill.nieuw{background:#fff3cd;color:#7a5a00;} .pill.benaderd{background:#e7f0ff;color:#1c4fa0;}
+  .pill.offerte{background:#ede7f6;color:#5e35b1;} .pill.gewonnen{background:#e8f5e9;color:var(--ok);}
+  .pill.verloren{background:#fdecec;color:var(--err);}
+  .lead-row{cursor:pointer;} .lead-row:hover{background:#faf8f3;}
+  .detail{background:#faf8f3;border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:10px;}
+  .detail dl{display:grid;grid-template-columns:160px 1fr;gap:4px 12px;margin:0 0 12px;font-size:.9rem;}
+  .detail dt{color:var(--muted);} .detail dd{margin:0;}
+  .group-block{border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;}
+  .group-block h3{margin:0 0 8px;font-size:1rem;}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;
+    padding:11px 18px;border-radius:8px;font-size:.9rem;box-shadow:0 6px 20px rgba(0,0,0,.2);z-index:50;opacity:0;
+    transition:.2s;pointer-events:none;}
+  .toast.show{opacity:1;}
+  .muted{color:var(--muted);} .small{font-size:.82rem;}
+  @media(max-width:640px){ .detail dl{grid-template-columns:1fr;} table{font-size:.82rem;} }
+</style>
+</head>
+<body>
+
+<!-- ===================== LOGIN ===================== -->
+<div id="view-login" class="login-wrap">
+  <div class="login-card">
+    <div class="brand">
+      <div class="mark"><span class="b1"></span><span class="b2"></span><span class="b3"></span></div>
+      <div><div class="name">SUN SAUNA &amp; POOLWORLD</div><div class="tag">DASHBOARD</div></div>
+    </div>
+    <div class="field"><label>E-mailadres</label><input type="email" id="login-email" autocomplete="username" placeholder="naam@voorbeeld.nl"></div>
+    <div class="field"><label>Wachtwoord</label><input type="password" id="login-pw" autocomplete="current-password" placeholder="••••••••"></div>
+    <button class="btn primary" id="btn-login" style="width:100%;">Inloggen</button>
+    <div id="login-msg" class="msg hide"></div>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div id="view-app" class="hide">
+  <header class="top">
+    <div class="l">
+      <div class="brand">
+        <div class="mark"><span class="b1"></span><span class="b2"></span><span class="b3"></span></div>
+        <div><div class="name">SUN SAUNA &amp; POOLWORLD</div><div class="tag">DASHBOARD</div></div>
+      </div>
+    </div>
+    <div class="l">
+      <span class="who" id="who"></span>
+      <button class="btn ghost sm" id="btn-logout">Uitloggen</button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button data-tab="leads" class="active">Leads</button>
+    <button data-tab="prijzen">Prijzen</button>
+    <button data-tab="account">Account</button>
+  </div>
+
+  <main>
+    <!-- ===== LEADS ===== -->
+    <section id="tab-leads">
+      <div class="card">
+        <div class="toolbar">
+          <div>
+            <h2 style="margin:0;">Binnengekomen aanvragen</h2>
+            <div class="sub" style="margin:0;" id="leads-count">—</div>
+          </div>
+          <div class="row" style="flex:0;">
+            <select id="leads-filter" style="width:auto;">
+              <option value="">Alle statussen</option>
+              <option value="nieuw">Nieuw</option>
+              <option value="benaderd">Benaderd</option>
+              <option value="offerte">Offerte</option>
+              <option value="gewonnen">Gewonnen</option>
+              <option value="verloren">Verloren</option>
+            </select>
+            <button class="btn ghost sm" id="btn-refresh-leads">Vernieuwen</button>
+          </div>
+        </div>
+        <div id="leads-table"></div>
+      </div>
+    </section>
+
+    <!-- ===== PRIJZEN ===== -->
+    <section id="tab-prijzen" class="hide">
+      <div class="card">
+        <h2>Maten &amp; basisprijzen</h2>
+        <div class="sub">Basisprijs = compleet standaardpakket, incl. btw, excl. grondwerk.</div>
+        <div id="sizes-table"></div>
+        <div class="savebar"><button class="btn primary" id="save-sizes">Maten opslaan</button></div>
+      </div>
+
+      <div class="card">
+        <h2>Standaardpakket — onderdelen</h2>
+        <div class="sub">Prijs per maat (5 kolommen, in dezelfde volgorde als de maten hierboven).</div>
+        <div id="items-table"></div>
+        <div class="savebar"><button class="btn primary" id="save-items">Onderdelen opslaan</button></div>
+      </div>
+
+      <div class="card">
+        <h2>Opties</h2>
+        <div class="sub">Meerprijs per maat. 0 = inbegrepen in het standaardpakket.</div>
+        <div id="options-blocks"></div>
+        <div class="savebar"><button class="btn primary" id="save-options">Opties opslaan</button></div>
+      </div>
+
+      <div class="card">
+        <h2>Instellingen</h2>
+        <div class="row">
+          <div class="field"><label>Btw-tarief (bijv. 0.21 = 21%)</label><input id="set-btw"></div>
+          <div class="field"><label>CTA "Offerte aanvragen" — link</label><input id="set-quote"></div>
+          <div class="field"><label>CTA "Terugbelverzoek" — link</label><input id="set-call"></div>
+        </div>
+        <div class="savebar"><button class="btn primary" id="save-settings">Instellingen opslaan</button></div>
+      </div>
+    </section>
+
+    <!-- ===== ACCOUNT ===== -->
+    <section id="tab-account" class="hide">
+      <div class="card">
+        <h2>Wachtwoord wijzigen</h2>
+        <div class="row">
+          <div class="field"><label>Nieuw wachtwoord (min. 8 tekens)</label><input type="password" id="new-pw" autocomplete="new-password"></div>
+        </div>
+        <div class="savebar"><button class="btn primary" id="save-pw">Wachtwoord opslaan</button></div>
+      </div>
+      <div class="card">
+        <h2>Beheerders (toegang tot dit dashboard)</h2>
+        <div class="sub">Alleen deze e-mailadressen kunnen inloggen en wijzigen.</div>
+        <div id="admins-list"></div>
+        <div class="row" style="margin-top:12px;">
+          <div class="field" style="flex:2;"><label>Nieuw e-mailadres toevoegen</label><input id="new-admin" placeholder="collega@sspw.nl"></div>
+          <div class="field" style="flex:0;align-self:flex-end;"><button class="btn primary" id="add-admin">Toevoegen</button></div>
+        </div>
+        <div class="small muted">Let op: na toevoegen moet de persoon eenmalig een account aanmaken/wachtwoord instellen. Vraag mij (de bouwer) om dat te regelen, of gebruik "wachtwoord vergeten".</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function(){
+  "use strict";
+  var SUPABASE_URL = "https://urqzkjqobjmwuasnlnxg.supabase.co";
+  var SUPABASE_ANON_KEY = "sb_publishable_0SocbHcipoQMc88mKs8wnw_-kt29LUV";
+  var db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  var $ = function(id){ return document.getElementById(id); };
+  function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
+  function euro(n){ if(n==null||isNaN(n))return "—"; return "€ "+Number(n).toLocaleString("nl-NL",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function toast(msg,bad){ var t=$("toast"); t.textContent=msg; t.style.background=bad?"#c62828":"#2b2b2b"; t.classList.add("show"); setTimeout(function(){t.classList.remove("show");},2200); }
+
+  // Data caches
+  var SIZES=[], ITEMS=[], GROUPS=[], OPTIONS=[], LEADS=[];
+
+  // ---------- Auth ----------
+  $("btn-login").addEventListener("click", doLogin);
+  $("login-pw").addEventListener("keydown", function(e){ if(e.key==="Enter") doLogin(); });
+  $("btn-logout").addEventListener("click", function(){ db.auth.signOut().then(showLogin); });
+
+  function loginMsg(text,bad){ var m=$("login-msg"); m.textContent=text; m.className="msg "+(bad?"err":"ok"); m.classList.remove("hide"); }
+
+  async function doLogin(){
+    var email=$("login-email").value.trim(), pw=$("login-pw").value;
+    if(!email||!pw){ loginMsg("Vul e-mail en wachtwoord in.",true); return; }
+    $("btn-login").disabled=true; loginMsg("Bezig met inloggen…",false);
+    var res = await db.auth.signInWithPassword({ email:email, password:pw });
+    $("btn-login").disabled=false;
+    if(res.error){ loginMsg("Inloggen mislukt: "+res.error.message,true); return; }
+    await afterLogin();
+  }
+
+  async function afterLogin(){
+    // Admin-check
+    var r = await db.rpc("is_admin");
+    if(r.error || r.data!==true){
+      loginMsg("Dit account heeft geen beheerderstoegang.",true);
+      await db.auth.signOut();
+      return;
+    }
+    var u = (await db.auth.getUser()).data.user;
+    $("who").textContent = u ? u.email : "";
+    $("view-login").classList.add("hide");
+    $("view-app").classList.remove("hide");
+    await Promise.all([loadLeads(), loadPricing(), loadAdmins()]);
+  }
+  function showLogin(){
+    $("view-app").classList.add("hide");
+    $("view-login").classList.remove("hide");
+    $("login-pw").value="";
+  }
+
+  // ---------- Tabs ----------
+  document.querySelectorAll(".tabs button").forEach(function(b){
+    b.addEventListener("click", function(){
+      document.querySelectorAll(".tabs button").forEach(function(x){x.classList.remove("active");});
+      b.classList.add("active");
+      ["leads","prijzen","account"].forEach(function(t){ $("tab-"+t).classList.toggle("hide", t!==b.dataset.tab); });
+    });
+  });
+
+  // ---------- Leads ----------
+  $("btn-refresh-leads").addEventListener("click", loadLeads);
+  $("leads-filter").addEventListener("change", renderLeads);
+
+  async function loadLeads(){
+    var r = await db.from("calculator_leads").select("*").order("created_at",{ascending:false});
+    if(r.error){ toast("Leads laden mislukt: "+r.error.message,true); return; }
+    LEADS = r.data||[];
+    renderLeads();
+  }
+
+  function renderLeads(){
+    var filter=$("leads-filter").value;
+    var rows = LEADS.filter(function(l){ return !filter || (l.status||"nieuw")===filter; });
+    $("leads-count").textContent = rows.length+" aanvraag(en)"+(filter?(" — filter: "+filter):"");
+    if(!rows.length){ $("leads-table").innerHTML='<p class="muted">Geen aanvragen.</p>'; return; }
+    var html='<table><thead><tr><th>Datum</th><th>Naam</th><th>Product</th><th>Indicatie</th><th>Status</th></tr></thead><tbody>';
+    rows.forEach(function(l){
+      var d = l.created_at ? new Date(l.created_at).toLocaleDateString("nl-NL",{day:"2-digit",month:"2-digit",year:"numeric"}) : "";
+      var st = l.status||"nieuw";
+      html+='<tr class="lead-row" data-id="'+l.id+'">'
+          +'<td>'+esc(d)+'</td><td>'+esc(l.name)+'<br><span class="small muted">'+esc(l.email)+'</span></td>'
+          +'<td>'+esc(l.selected_variant||l.selected_product||"")+'</td>'
+          +'<td>'+euro(l.estimated_total)+'</td>'
+          +'<td><span class="pill '+esc(st)+'">'+esc(st)+'</span></td></tr>';
+      html+='<tr id="d-'+l.id+'" class="hide"><td colspan="5"></td></tr>';
+    });
+    html+='</tbody></table>';
+    $("leads-table").innerHTML=html;
+    $("leads-table").querySelectorAll(".lead-row").forEach(function(tr){
+      tr.addEventListener("click", function(){ toggleLead(tr.dataset.id); });
+    });
+  }
+
+  function toggleLead(id){
+    var l = LEADS.filter(function(x){return String(x.id)===String(id);})[0];
+    var holder = $("d-"+id); if(!holder) return;
+    if(!holder.classList.contains("hide")){ holder.classList.add("hide"); return; }
+    document.querySelectorAll('[id^="d-"]').forEach(function(h){h.classList.add("hide");});
+    var ca = l.calculator_answers||{};
+    var opts = (l.selected_options||[]);
+    holder.querySelector("td").innerHTML =
+      '<div class="detail">'
+      + '<dl>'
+      + '<dt>Naam</dt><dd>'+esc(l.name)+'</dd>'
+      + '<dt>E-mail</dt><dd><a href="mailto:'+esc(l.email)+'">'+esc(l.email)+'</a></dd>'
+      + '<dt>Telefoon</dt><dd><a href="tel:'+esc(l.phone)+'">'+esc(l.phone)+'</a></dd>'
+      + '<dt>Bedrijf</dt><dd>'+esc(l.company||"—")+'</dd>'
+      + '<dt>Woonplaats</dt><dd>'+esc(l.city||"—")+'</dd>'
+      + '<dt>Startmoment</dt><dd>'+esc(l.timeline||"—")+'</dd>'
+      + '<dt>Product</dt><dd>'+esc(l.selected_product||"")+'</dd>'
+      + '<dt>Gekozen opties</dt><dd>'+(opts.length?opts.map(esc).join("<br>"):"—")+'</dd>'
+      + '<dt>Indicatie (incl. btw)</dt><dd>'+euro(l.estimated_total)+(l.estimate_low?(" &nbsp;(band: "+euro(l.estimate_low)+" – "+euro(l.estimate_high)+")"):"")+'</dd>'
+      + '<dt>Bericht</dt><dd>'+esc(l.message||"—")+'</dd>'
+      + (ca.custom_dimensions?('<dt>Maatwerk</dt><dd>'+esc(ca.custom_dimensions)+'</dd>'):'')
+      + '</dl>'
+      + '<div class="row">'
+      +   '<div class="field" style="flex:0;min-width:170px;"><label>Status</label>'
+      +     '<select id="st-'+l.id+'">'
+      +       ['nieuw','benaderd','offerte','gewonnen','verloren'].map(function(s){return '<option value="'+s+'"'+(((l.status||"nieuw")===s)?" selected":"")+'>'+s+'</option>';}).join('')
+      +     '</select></div>'
+      +   '<div class="field"><label>Interne notities</label><textarea id="nt-'+l.id+'" rows="2">'+esc(l.internal_notes||"")+'</textarea></div>'
+      + '</div>'
+      + '<div class="savebar"><button class="btn primary sm" id="sv-'+l.id+'">Opslaan</button></div>'
+      + '</div>';
+    holder.classList.remove("hide");
+    $("sv-"+l.id).addEventListener("click", function(){ saveLead(l.id); });
+  }
+
+  async function saveLead(id){
+    var status=$("st-"+id).value, notes=$("nt-"+id).value;
+    var r = await db.from("calculator_leads").update({status:status, internal_notes:notes}).eq("id",id);
+    if(r.error){ toast("Opslaan mislukt: "+r.error.message,true); return; }
+    var l = LEADS.filter(function(x){return String(x.id)===String(id);})[0];
+    if(l){ l.status=status; l.internal_notes=notes; }
+    renderLeads(); toast("Lead opgeslagen.");
+  }
+
+  // ---------- Prijzen laden ----------
+  async function loadPricing(){
+    var q = await Promise.all([
+      db.from("pricing_sizes").select("*").order("sort_order"),
+      db.from("pricing_package_items").select("*").order("sort_order"),
+      db.from("pricing_option_groups").select("*").order("sort_order"),
+      db.from("pricing_options").select("*").order("sort_order"),
+      db.from("settings").select("*")
+    ]);
+    for(var i=0;i<q.length;i++){ if(q[i].error){ toast("Prijzen laden mislukt: "+q[i].error.message,true); return; } }
+    SIZES=q[0].data||[]; ITEMS=q[1].data||[]; GROUPS=q[2].data||[]; OPTIONS=q[3].data||[];
+    var settings=q[4].data||[];
+    renderSizes(); renderItems(); renderOptions();
+    settings.forEach(function(row){
+      if(row.key==="btw_tarief")    $("set-btw").value=row.value;
+      if(row.key==="cta_quote_url") $("set-quote").value=row.value;
+      if(row.key==="cta_call_url")  $("set-call").value=row.value;
+    });
+  }
+
+  function priceInputs(prices, cls){
+    var arr=prices||[]; var h='<div class="row price-grid" '+(cls?('data-grid="'+cls+'"'):'')+'>';
+    for(var i=0;i<SIZES.length;i++){
+      h+='<div class="field" style="flex:1;min-width:80px;"><input class="num" type="number" step="0.01" value="'+(arr[i]!=null?arr[i]:0)+'"></div>';
+    }
+    return h+'</div>';
+  }
+  function readGrid(gridEl){ return [].map.call(gridEl.querySelectorAll("input"), function(inp){ return Number(inp.value)||0; }); }
+
+  function sizeHeaders(){ return SIZES.map(function(s){ return '<th class="num-cell">'+esc(s.label)+'</th>'; }).join(''); }
+
+  function renderSizes(){
+    var h='<table><thead><tr><th>ID</th><th>Label</th><th>Volume-tekst</th><th>m³</th><th>Basisprijs (incl. btw)</th></tr></thead><tbody>';
+    SIZES.forEach(function(s,i){
+      h+='<tr data-id="'+s.id+'">'
+        +'<td class="muted small">'+esc(s.id)+'</td>'
+        +'<td><input data-f="label" value="'+esc(s.label)+'"></td>'
+        +'<td><input data-f="vol_label" value="'+esc(s.vol_label)+'"></td>'
+        +'<td class="num-cell"><input class="num" data-f="m3" type="number" step="0.01" value="'+s.m3+'"></td>'
+        +'<td class="num-cell"><input class="num" data-f="base_price" type="number" step="0.01" value="'+s.base_price+'"></td>'
+        +'</tr>';
+    });
+    $("sizes-table").innerHTML=h+'</tbody></table>';
+  }
+
+  function renderItems(){
+    var h='<table><thead><tr><th>Onderdeel</th>'+sizeHeaders()+'</tr></thead><tbody>';
+    ITEMS.forEach(function(it){
+      h+='<tr data-id="'+it.id+'"><td><input data-f="name" value="'+esc(it.name)+'"></td>';
+      for(var i=0;i<SIZES.length;i++){ h+='<td class="num-cell"><input class="num pr" type="number" step="0.01" value="'+((it.prices&&it.prices[i]!=null)?it.prices[i]:0)+'"></td>'; }
+      h+='</tr>';
+    });
+    $("items-table").innerHTML=h+'</tbody></table>';
+  }
+
+  function renderOptions(){
+    var h='';
+    GROUPS.forEach(function(g){
+      var opts = OPTIONS.filter(function(o){return o.group_id===g.id;});
+      h+='<div class="group-block" data-group="'+g.id+'">'
+        +'<h3>'+esc(g.label)+' <span class="small muted">('+esc(g.type)+')</span></h3>'
+        +'<table><thead><tr><th>Optie</th><th>Omschrijving</th>'+sizeHeaders()+'</tr></thead><tbody>';
+      opts.forEach(function(o){
+        h+='<tr data-id="'+o.id+'"><td><input data-f="name" value="'+esc(o.name)+'"></td>'
+          +'<td><input data-f="description" value="'+esc(o.description)+'"></td>';
+        for(var i=0;i<SIZES.length;i++){ h+='<td class="num-cell"><input class="num pr" type="number" step="0.01" value="'+((o.prices&&o.prices[i]!=null)?o.prices[i]:0)+'"></td>'; }
+        h+='</tr>';
+      });
+      h+='</tbody></table></div>';
+    });
+    $("options-blocks").innerHTML=h;
+  }
+
+  // ---------- Prijzen opslaan ----------
+  $("save-sizes").addEventListener("click", async function(){
+    var rows = $("sizes-table").querySelectorAll("tr[data-id]"); var err=null;
+    for(var k=0;k<rows.length;k++){ var tr=rows[k];
+      var upd={ label:tr.querySelector('[data-f=label]').value,
+                vol_label:tr.querySelector('[data-f=vol_label]').value,
+                m3:Number(tr.querySelector('[data-f=m3]').value)||0,
+                base_price:Number(tr.querySelector('[data-f=base_price]').value)||0,
+                updated_at:new Date().toISOString() };
+      var r = await db.from("pricing_sizes").update(upd).eq("id",tr.dataset.id); if(r.error){err=r.error;break;}
+    }
+    if(err){ toast("Opslaan mislukt: "+err.message,true);} else { toast("Maten opgeslagen."); loadPricing(); }
+  });
+
+  $("save-items").addEventListener("click", async function(){
+    var rows=$("items-table").querySelectorAll("tr[data-id]"); var err=null;
+    for(var k=0;k<rows.length;k++){ var tr=rows[k];
+      var prices=[].map.call(tr.querySelectorAll(".pr"),function(i){return Number(i.value)||0;});
+      var r=await db.from("pricing_package_items").update({name:tr.querySelector('[data-f=name]').value,prices:prices,updated_at:new Date().toISOString()}).eq("id",tr.dataset.id);
+      if(r.error){err=r.error;break;}
+    }
+    if(err){ toast("Opslaan mislukt: "+err.message,true);} else { toast("Onderdelen opgeslagen."); loadPricing(); }
+  });
+
+  $("save-options").addEventListener("click", async function(){
+    var rows=$("options-blocks").querySelectorAll("tr[data-id]"); var err=null;
+    for(var k=0;k<rows.length;k++){ var tr=rows[k];
+      var prices=[].map.call(tr.querySelectorAll(".pr"),function(i){return Number(i.value)||0;});
+      var r=await db.from("pricing_options").update({name:tr.querySelector('[data-f=name]').value,description:tr.querySelector('[data-f=description]').value,prices:prices,updated_at:new Date().toISOString()}).eq("id",tr.dataset.id);
+      if(r.error){err=r.error;break;}
+    }
+    if(err){ toast("Opslaan mislukt: "+err.message,true);} else { toast("Opties opgeslagen."); loadPricing(); }
+  });
+
+  $("save-settings").addEventListener("click", async function(){
+    var btw=Number($("set-btw").value);
+    var rows=[ {key:"btw_tarief",value:(isNaN(btw)?0.21:btw)},
+               {key:"cta_quote_url",value:$("set-quote").value},
+               {key:"cta_call_url",value:$("set-call").value} ];
+    var err=null;
+    for(var k=0;k<rows.length;k++){
+      var r=await db.from("settings").update({value:rows[k].value,updated_at:new Date().toISOString()}).eq("key",rows[k].key);
+      if(r.error){err=r.error;break;}
+    }
+    if(err){ toast("Opslaan mislukt: "+err.message,true);} else { toast("Instellingen opgeslagen."); }
+  });
+
+  // ---------- Account ----------
+  $("save-pw").addEventListener("click", async function(){
+    var pw=$("new-pw").value;
+    if(!pw||pw.length<8){ toast("Wachtwoord moet minstens 8 tekens zijn.",true); return; }
+    var r=await db.auth.updateUser({password:pw});
+    if(r.error){ toast("Mislukt: "+r.error.message,true);} else { $("new-pw").value=""; toast("Wachtwoord gewijzigd."); }
+  });
+
+  async function loadAdmins(){
+    var r=await db.from("admins").select("*").order("email");
+    if(r.error){ $("admins-list").innerHTML='<p class="muted small">Kon beheerders niet laden.</p>'; return; }
+    var h='<table><tbody>';
+    (r.data||[]).forEach(function(a){
+      h+='<tr><td>'+esc(a.email)+'</td><td style="text-align:right;"><button class="btn danger sm" data-email="'+esc(a.email)+'">Verwijderen</button></td></tr>';
+    });
+    $("admins-list").innerHTML=h+'</tbody></table>';
+    $("admins-list").querySelectorAll("button[data-email]").forEach(function(b){
+      b.addEventListener("click", function(){ removeAdmin(b.dataset.email); });
+    });
+  }
+  $("add-admin").addEventListener("click", async function(){
+    var email=$("new-admin").value.trim().toLowerCase();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ toast("Vul een geldig e-mailadres in.",true); return; }
+    var r=await db.from("admins").insert([{email:email}]);
+    if(r.error){ toast("Mislukt: "+r.error.message,true);} else { $("new-admin").value=""; toast("Beheerder toegevoegd."); loadAdmins(); }
+  });
+  async function removeAdmin(email){
+    if(!confirm("Beheerder "+email+" verwijderen?")) return;
+    var r=await db.from("admins").delete().eq("email",email);
+    if(r.error){ toast("Mislukt: "+r.error.message,true);} else { toast("Beheerder verwijderd."); loadAdmins(); }
+  }
+
+  // ---------- init ----------
+  (async function(){
+    var s = await db.auth.getSession();
+    if(s.data && s.data.session){ await afterLogin(); } else { showLogin(); }
+  })();
+})();
+</script>
+</body>
+</html>
