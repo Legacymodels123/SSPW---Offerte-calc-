@@ -93,10 +93,34 @@
       <div class="mark"><span class="b1"></span><span class="b2"></span><span class="b3"></span></div>
       <div><div class="name">SUN SAUNA &amp; POOLWORLD</div><div class="tag">DASHBOARD</div></div>
     </div>
-    <div class="field"><label>E-mailadres</label><input type="email" id="login-email" autocomplete="username" placeholder="naam@voorbeeld.nl"></div>
-    <div class="field"><label>Wachtwoord</label><input type="password" id="login-pw" autocomplete="current-password" placeholder="••••••••"></div>
-    <button class="btn primary" id="btn-login" style="width:100%;">Inloggen</button>
-    <div id="login-msg" class="msg hide"></div>
+
+    <!-- Panel: inloggen -->
+    <div id="panel-login">
+      <div class="field"><label>E-mailadres</label><input type="email" id="login-email" autocomplete="username" placeholder="naam@voorbeeld.nl"></div>
+      <div class="field"><label>Wachtwoord</label><input type="password" id="login-pw" autocomplete="current-password" placeholder="••••••••"></div>
+      <button class="btn primary" id="btn-login" style="width:100%;">Inloggen</button>
+      <div style="text-align:center;margin-top:12px;"><a href="#" id="link-forgot" class="small" style="color:var(--gold-d);">Wachtwoord vergeten?</a></div>
+      <div id="login-msg" class="msg hide"></div>
+    </div>
+
+    <!-- Panel: wachtwoord vergeten -->
+    <div id="panel-forgot" class="hide">
+      <p class="small muted" style="margin-top:0;">Vul je e-mailadres in. Als het bekend is, ontvang je een e-mail met een herstellink.</p>
+      <div class="field"><label>E-mailadres</label><input type="email" id="forgot-email" placeholder="naam@voorbeeld.nl"></div>
+      <button class="btn primary" id="btn-forgot" style="width:100%;">Stuur herstellink</button>
+      <div style="text-align:center;margin-top:12px;"><a href="#" id="link-back-login" class="small" style="color:var(--gold-d);">Terug naar inloggen</a></div>
+      <div id="forgot-msg" class="msg hide"></div>
+    </div>
+
+    <!-- Panel: nieuw wachtwoord instellen (via mail-link met token) -->
+    <div id="panel-setpw" class="hide">
+      <h3 id="setpw-title" style="margin:0 0 6px;">Wachtwoord instellen</h3>
+      <p class="small muted" style="margin-top:0;">Kies een wachtwoord van minstens 8 tekens.</p>
+      <div class="field"><label>Nieuw wachtwoord</label><input type="password" id="setpw-pw" autocomplete="new-password" placeholder="••••••••"></div>
+      <div class="field"><label>Herhaal wachtwoord</label><input type="password" id="setpw-pw2" autocomplete="new-password" placeholder="••••••••"></div>
+      <button class="btn primary" id="btn-setpw" style="width:100%;">Opslaan en inloggen</button>
+      <div id="setpw-msg" class="msg hide"></div>
+    </div>
   </div>
 </div>
 
@@ -195,10 +219,10 @@
         <div class="sub">Alleen deze e-mailadressen kunnen inloggen en wijzigen.</div>
         <div id="admins-list"></div>
         <div class="row" style="margin-top:12px;">
-          <div class="field" style="flex:2;"><label>Nieuw e-mailadres toevoegen</label><input id="new-admin" placeholder="collega@sspw.nl"></div>
-          <div class="field" style="flex:0;align-self:flex-end;"><button class="btn primary" id="add-admin">Toevoegen</button></div>
+          <div class="field" style="flex:2;"><label>Nieuwe beheerder uitnodigen</label><input id="new-admin" placeholder="collega@sspw.nl"></div>
+          <div class="field" style="flex:0;align-self:flex-end;"><button class="btn primary" id="add-admin">Uitnodiging sturen</button></div>
         </div>
-        <div class="small muted">Let op: na toevoegen moet de persoon eenmalig een account aanmaken/wachtwoord instellen. Vraag mij (de bouwer) om dat te regelen, of gebruik "wachtwoord vergeten".</div>
+        <div class="small muted">De persoon ontvangt een uitnodigingsmail met een link om zelf een wachtwoord in te stellen en direct toegang te krijgen.</div>
       </div>
     </section>
   </main>
@@ -227,7 +251,45 @@
   $("login-pw").addEventListener("keydown", function(e){ if(e.key==="Enter") doLogin(); });
   $("btn-logout").addEventListener("click", function(){ db.auth.signOut().then(showLogin); });
 
-  function loginMsg(text,bad){ var m=$("login-msg"); m.textContent=text; m.className="msg "+(bad?"err":"ok"); m.classList.remove("hide"); }
+  function setMsg(id,text,bad){ var m=$(id); m.textContent=text; m.className="msg "+(bad?"err":"ok"); m.classList.remove("hide"); }
+  function loginMsg(text,bad){ setMsg("login-msg",text,bad); }
+  function showPanel(name){
+    ["login","forgot","setpw"].forEach(function(p){ $("panel-"+p).classList.toggle("hide", p!==name); });
+  }
+
+  // Wachtwoord vergeten — panelwissels
+  $("link-forgot").addEventListener("click", function(e){ e.preventDefault(); $("forgot-msg").classList.add("hide"); showPanel("forgot"); });
+  $("link-back-login").addEventListener("click", function(e){ e.preventDefault(); showPanel("login"); });
+
+  $("btn-forgot").addEventListener("click", async function(){
+    var email=$("forgot-email").value.trim();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ setMsg("forgot-msg","Vul een geldig e-mailadres in.",true); return; }
+    $("btn-forgot").disabled=true;
+    var r = await db.rpc("request_password_reset",{ p_email:email });
+    $("btn-forgot").disabled=false;
+    if(r.error){ setMsg("forgot-msg","Er ging iets mis: "+r.error.message,true); return; }
+    setMsg("forgot-msg","Als dit adres bekend is, is er een e-mail met een herstellink verstuurd. Controleer je inbox (en spam).",false);
+  });
+
+  // Nieuw wachtwoord instellen via mail-link (token in URL)
+  var TOKEN=null, TOKEN_TYPE=null;
+  $("btn-setpw").addEventListener("click", async function(){
+    var pw=$("setpw-pw").value, pw2=$("setpw-pw2").value;
+    if(pw.length<8){ setMsg("setpw-msg","Wachtwoord moet minstens 8 tekens zijn.",true); return; }
+    if(pw!==pw2){ setMsg("setpw-msg","De wachtwoorden komen niet overeen.",true); return; }
+    $("btn-setpw").disabled=true;
+    var r = await db.rpc("accept_token",{ p_token:TOKEN, p_password:pw });
+    $("btn-setpw").disabled=false;
+    if(r.error){ setMsg("setpw-msg","Er ging iets mis: "+r.error.message,true); return; }
+    if(!r.data || r.data.ok!==true){ setMsg("setpw-msg",(r.data&&r.data.message)||"Deze link is ongeldig of verlopen.",true); return; }
+    // Schoon de URL op en log direct in.
+    history.replaceState(null,"",location.pathname);
+    setMsg("setpw-msg","Gelukt! Je wordt ingelogd…",false);
+    var em = r.data.email;
+    var li = await db.auth.signInWithPassword({ email:em, password:pw });
+    if(li.error){ showPanel("login"); loginMsg("Wachtwoord ingesteld. Log nu in.",false); $("login-email").value=em; }
+    else { await afterLogin(); }
+  });
 
   async function doLogin(){
     var email=$("login-email").value.trim(), pw=$("login-pw").value;
@@ -257,6 +319,7 @@
     $("view-app").classList.add("hide");
     $("view-login").classList.remove("hide");
     $("login-pw").value="";
+    showPanel("login");
   }
 
   // ---------- Tabs ----------
@@ -527,8 +590,12 @@
   $("add-admin").addEventListener("click", async function(){
     var email=$("new-admin").value.trim().toLowerCase();
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ toast("Vul een geldig e-mailadres in.",true); return; }
-    var r=await db.from("admins").insert([{email:email}]);
-    if(r.error){ toast("Mislukt: "+r.error.message,true);} else { $("new-admin").value=""; toast("Beheerder toegevoegd."); loadAdmins(); }
+    $("add-admin").disabled=true;
+    var r=await db.rpc("request_invite",{ p_email:email });
+    $("add-admin").disabled=false;
+    if(r.error){ toast("Mislukt: "+r.error.message,true); return; }
+    if(!r.data || r.data.ok!==true){ toast((r.data&&r.data.message)||"Mislukt.",true); return; }
+    $("new-admin").value=""; toast(r.data.message||"Uitnodiging verstuurd."); loadAdmins();
   });
   async function removeAdmin(email){
     if(!confirm("Beheerder "+email+" verwijderen?")) return;
@@ -538,6 +605,18 @@
 
   // ---------- init ----------
   (async function(){
+    // Mail-link met token? Toon dan het scherm om een wachtwoord in te stellen.
+    var params = new URLSearchParams(location.search);
+    var tk = params.get("token"), tp = params.get("type");
+    if(tk && (tp==="invite"||tp==="reset")){
+      TOKEN=tk; TOKEN_TYPE=tp;
+      await db.auth.signOut();  // eventuele oude sessie negeren
+      $("view-app").classList.add("hide");
+      $("view-login").classList.remove("hide");
+      $("setpw-title").textContent = (tp==="invite") ? "Account activeren" : "Nieuw wachtwoord instellen";
+      showPanel("setpw");
+      return;
+    }
     var s = await db.auth.getSession();
     if(s.data && s.data.session){ await afterLogin(); } else { showLogin(); }
   })();
