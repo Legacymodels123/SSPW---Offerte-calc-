@@ -543,14 +543,19 @@
     var h='';
     GROUPS.forEach(function(g){
       var opts = OPTIONS.filter(function(o){return o.group_id===g.id;});
+      var span = 2 + SIZES.length;
       h+='<div class="group-block" data-group="'+g.id+'">'
         +'<h3>'+esc(g.label)+' <span class="small muted">('+esc(g.type)+')</span></h3>'
+        +'<div class="field" style="margin-bottom:10px;"><label>Uitleg bij deze groep — zichtbaar als "ⓘ uitleg" in de calculator (optioneel)</label>'
+        +'<textarea data-ginfo="'+g.id+'" rows="2" placeholder="Leeg laten = geen uitleg-dropdown">'+esc(g.info||'')+'</textarea></div>'
         +'<table><thead><tr><th>Optie</th><th>Omschrijving</th>'+sizeHeaders()+'</tr></thead><tbody>';
       opts.forEach(function(o){
         h+='<tr data-id="'+o.id+'"><td><input data-f="name" value="'+esc(o.name)+'"></td>'
           +'<td><input data-f="description" value="'+esc(o.description)+'"></td>';
         for(var i=0;i<SIZES.length;i++){ h+='<td class="num-cell"><input class="num pr" type="number" step="0.01" value="'+((o.prices&&o.prices[i]!=null)?o.prices[i]:0)+'"></td>'; }
         h+='</tr>';
+        h+='<tr class="info-row"><td colspan="'+span+'"><label class="small muted" style="margin-bottom:3px;">Uitleg bij deze optie — "meer uitleg" in de calculator (optioneel)</label>'
+          +'<input data-info-for="'+o.id+'" value="'+esc(o.info||'')+'" placeholder="Leeg laten = geen uitleg"></td></tr>';
       });
       h+='</tbody></table></div>';
     });
@@ -582,11 +587,28 @@
   });
 
   $("save-options").addEventListener("click", async function(){
-    var rows=$("options-blocks").querySelectorAll("tr[data-id]"); var err=null;
-    for(var k=0;k<rows.length;k++){ var tr=rows[k];
+    var err=null;
+    // Groep-uitleg opslaan
+    var blocks=$("options-blocks").querySelectorAll(".group-block");
+    for(var b=0;b<blocks.length && !err;b++){
+      var gi=blocks[b].querySelector("[data-ginfo]");
+      if(gi){
+        var r=await db.from("pricing_option_groups").update({info:(gi.value.trim()||null),updated_at:new Date().toISOString()}).eq("id",gi.dataset.ginfo);
+        if(r.error){err=r.error;}
+      }
+    }
+    // Opties + optie-uitleg opslaan
+    var rows=$("options-blocks").querySelectorAll("tr[data-id]");
+    for(var k=0;k<rows.length && !err;k++){ var tr=rows[k];
       var prices=[].map.call(tr.querySelectorAll(".pr"),function(i){return Number(i.value)||0;});
-      var r=await db.from("pricing_options").update({name:tr.querySelector('[data-f=name]').value,description:tr.querySelector('[data-f=description]').value,prices:prices,updated_at:new Date().toISOString()}).eq("id",tr.dataset.id);
-      if(r.error){err=r.error;break;}
+      var infoEl=$("options-blocks").querySelector('[data-info-for="'+tr.dataset.id+'"]');
+      var r=await db.from("pricing_options").update({
+        name:tr.querySelector('[data-f=name]').value,
+        description:tr.querySelector('[data-f=description]').value,
+        info:(infoEl && infoEl.value.trim()) ? infoEl.value.trim() : null,
+        prices:prices, updated_at:new Date().toISOString()
+      }).eq("id",tr.dataset.id);
+      if(r.error){err=r.error;}
     }
     if(err){ toast("Opslaan mislukt: "+err.message,true);} else { toast("Opties opgeslagen."); loadPricing(); }
   });

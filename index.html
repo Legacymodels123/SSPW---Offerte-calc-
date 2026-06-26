@@ -100,6 +100,18 @@
   .ssc-choice .price{white-space:nowrap;font-weight:700;color:var(--c-accent-d);font-size:.92rem;}
   .ssc-choice .price.incl{color:var(--c-ok);}
   .ssc-choice input{margin-top:3px;width:18px;height:18px;accent-color:var(--c-primary);}
+  /* Uitklapbare uitleg ("ⓘ uitleg") bij groepen en opties */
+  .ssc-info-tog{display:inline-flex;align-items:center;gap:4px;background:none;border:none;color:var(--c-primary-d);
+    font-size:.78rem;cursor:pointer;padding:2px 0;margin-top:4px;font-family:inherit;font-weight:600;}
+  .ssc-info-tog:hover{text-decoration:underline;}
+  .ssc-info-tog .ic{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;
+    border:1.5px solid var(--c-primary-d);font-size:.62rem;font-style:italic;font-weight:700;line-height:1;}
+  .ssc-info-tog .ar{transition:transform .15s;}
+  .ssc-info-tog.open .ar{transform:rotate(180deg);}
+  .ssc-info{display:none;font-size:.83rem;color:var(--c-text);background:#faf8f3;border:1px solid var(--c-border);
+    border-radius:8px;padding:9px 11px;margin-top:6px;line-height:1.45;}
+  .ssc-info.open{display:block;}
+  .ssc-group > .info-line{margin:-2px 0 8px;}
 
   /* Formuliervelden */
   .ssc-field{margin-bottom:14px;}
@@ -630,12 +642,20 @@
       html += '<div class="ssc-group" data-group="'+g.key+'">';
       html += '<span class="lbl">'+esc(g.label)+'</span>';
       if(g.hint){ html += '<div class="ssc-stepname" style="text-align:left;margin:-4px 0 8px;">'+esc(g.hint)+'</div>'; }
+      if(g.info){
+        html += '<div class="info-line">'
+              +   '<button type="button" class="ssc-info-tog" data-target="ginfo-'+g.key+'"><span class="ic">i</span> uitleg <span class="ar">▾</span></button>'
+              +   '<div class="ssc-info" id="ginfo-'+g.key+'">'+esc(g.info)+'</div>'
+              + '</div>';
+      }
       g.options.forEach(function(o){
         var inputType = (g.type==="single") ? "radio" : "checkbox";
         html += '<label class="ssc-choice" data-group="'+g.key+'" data-opt="'+o.id+'">'
               +   '<span class="c-l">'
               +     '<input type="'+inputType+'" name="grp-'+g.key+'" value="'+o.id+'">'
-              +     '<span><span class="nm">'+esc(o.nm)+'</span><br><span class="ds">'+esc(o.ds)+'</span></span>'
+              +     '<span><span class="nm">'+esc(o.nm)+'</span><br><span class="ds">'+esc(o.ds)+'</span>'
+              +       (o.info ? '<br><button type="button" class="ssc-info-tog" data-target="oinfo-'+g.key+'-'+o.id+'"><span class="ic">i</span> meer uitleg <span class="ar">▾</span></button><div class="ssc-info" id="oinfo-'+g.key+'-'+o.id+'">'+esc(o.info)+'</div>' : '')
+              +     '</span>'
               +   '</span>'
               +   '<span class="price" data-price-for="'+g.key+'_'+o.id+'"></span>'
               + '</label>';
@@ -643,6 +663,15 @@
       html += '</div>';
     });
     wrap.innerHTML = html;
+
+    // Uitleg-dropdowns in-/uitklappen (en voorkomen dat de optie wordt geselecteerd).
+    wrap.querySelectorAll(".ssc-info-tog").forEach(function(btn){
+      btn.addEventListener("click", function(e){
+        e.preventDefault(); e.stopPropagation();
+        var panel = $(btn.getAttribute("data-target"));
+        if(panel){ panel.classList.toggle("open"); btn.classList.toggle("open", panel.classList.contains("open")); }
+      });
+    });
 
     // Standaardkeuzes voorselecteren (single)
     GROUPS.forEach(function(g){
@@ -1029,10 +1058,11 @@
         return {
           key:g.id, label:g.label, type:g.type,
           hint:g.hint||undefined, optional:!!g.optional,
+          info:g.info||undefined,
           exclusiveSets:g.exclusive_sets||undefined,
           options:(dbOptions||[])
             .filter(function(o){ return o.group_id===g.id; })
-            .map(function(o){ return { id:o.option_key, nm:o.name, ds:o.description, prices:(o.prices||[]).map(Number) }; })
+            .map(function(o){ return { id:o.option_key, nm:o.name, ds:o.description, info:o.info||undefined, prices:(o.prices||[]).map(Number) }; })
         };
       });
       (dbSettings||[]).forEach(function(row){
