@@ -173,6 +173,9 @@
 
     <!-- ===== PRIJZEN ===== -->
     <section id="tab-prijzen" class="hide">
+      <div id="viewer-note" class="card hide" style="background:#fff7e6;border-color:#f3d28a;color:#7a5a00;">
+        Je hebt <b>Viewer</b>-toegang: je kunt de prijzen bekijken maar niet wijzigen.
+      </div>
       <div class="card">
         <h2>Maten &amp; basisprijzen</h2>
         <div class="sub">Basisprijs = compleet standaardpakket, incl. btw, excl. grondwerk.</div>
@@ -218,11 +221,18 @@
         <h2>Beheerders (toegang tot dit dashboard)</h2>
         <div class="sub">Alleen deze e-mailadressen kunnen inloggen en wijzigen.</div>
         <div id="admins-list"></div>
-        <div class="row" style="margin-top:12px;">
-          <div class="field" style="flex:2;"><label>Nieuwe beheerder uitnodigen</label><input id="new-admin" placeholder="collega@sspw.nl"></div>
+        <div class="row" style="margin-top:12px;" id="invite-row">
+          <div class="field" style="flex:2;min-width:200px;"><label>Nieuwe beheerder uitnodigen</label><input id="new-admin" placeholder="collega@sspw.nl"></div>
+          <div class="field" style="flex:0;min-width:140px;"><label>Rol</label>
+            <select id="new-admin-role">
+              <option value="viewer">Viewer</option>
+              <option value="admin">Admin</option>
+              <option value="super_admin">Super admin</option>
+            </select>
+          </div>
           <div class="field" style="flex:0;align-self:flex-end;"><button class="btn primary" id="add-admin">Uitnodiging sturen</button></div>
         </div>
-        <div class="small muted">De persoon ontvangt een uitnodigingsmail met een link om zelf een wachtwoord in te stellen en direct toegang te krijgen.</div>
+        <div class="small muted" id="invite-hint">De persoon ontvangt een uitnodigingsmail met een link om zelf een wachtwoord in te stellen en direct toegang te krijgen. Alleen super admins kunnen beheerders uitnodigen of rollen wijzigen.</div>
       </div>
     </section>
   </main>
@@ -245,6 +255,9 @@
 
   // Data caches
   var SIZES=[], ITEMS=[], GROUPS=[], OPTIONS=[], LEADS=[];
+  // Rol van de ingelogde gebruiker
+  var MYROLE="viewer", CAN_EDIT=false, IS_SUPER=false;
+  var ROLE_LABEL={ super_admin:"Super admin", admin:"Admin", viewer:"Viewer" };
 
   // ---------- Auth ----------
   $("btn-login").addEventListener("click", doLogin);
@@ -309,11 +322,35 @@
       await db.auth.signOut();
       return;
     }
+    // Rol ophalen
+    var rr = await db.rpc("my_role");
+    MYROLE = (rr.data || "viewer");
+    CAN_EDIT = (MYROLE==="super_admin" || MYROLE==="admin");
+    IS_SUPER = (MYROLE==="super_admin");
     var u = (await db.auth.getUser()).data.user;
-    $("who").textContent = u ? u.email : "";
+    $("who").innerHTML = (u ? esc(u.email) : "") + ' &middot; <span style="color:#b8954f;">'+esc(ROLE_LABEL[MYROLE]||MYROLE)+'</span>';
     $("view-login").classList.add("hide");
     $("view-app").classList.remove("hide");
     await Promise.all([loadLeads(), loadPricing(), loadAdmins()]);
+    applyPermissions();
+  }
+
+  // Toont/verbergt bewerk- en beheerfuncties op basis van de rol.
+  function applyPermissions(){
+    // Prijzen-opslaanknoppen
+    ["save-sizes","save-items","save-options","save-settings"].forEach(function(id){
+      var b=$(id); if(b) b.classList.toggle("hide", !CAN_EDIT);
+    });
+    // Prijs-invoervelden alleen bewerkbaar voor admin/super_admin
+    ["sizes-table","items-table","options-blocks"].forEach(function(id){
+      var c=$(id); if(c) c.querySelectorAll("input,select,textarea").forEach(function(el){ el.disabled=!CAN_EDIT; });
+    });
+    ["set-btw","set-quote","set-call"].forEach(function(id){ var el=$(id); if(el) el.disabled=!CAN_EDIT; });
+    // Melding voor viewers
+    var note=$("viewer-note"); if(note) note.classList.toggle("hide", CAN_EDIT);
+    // Beheerders-beheer alleen voor super admins
+    var inv=$("invite-row"); if(inv) inv.classList.toggle("hide", !IS_SUPER);
+    var invh=$("invite-hint"); if(invh) invh.classList.toggle("hide", !IS_SUPER);
   }
   function showLogin(){
     $("view-app").classList.add("hide");
@@ -427,15 +464,15 @@
       + '</dl>'
       + '<div class="row">'
       +   '<div class="field" style="flex:0;min-width:170px;"><label>Status</label>'
-      +     '<select id="st-'+l.id+'">'
+      +     '<select id="st-'+l.id+'"'+(CAN_EDIT?'':' disabled')+'>'
       +       ['nieuw','benaderd','offerte','gewonnen','verloren'].map(function(s){return '<option value="'+s+'"'+(((l.status||"nieuw")===s)?" selected":"")+'>'+s+'</option>';}).join('')
       +     '</select></div>'
-      +   '<div class="field"><label>Interne notities</label><textarea id="nt-'+l.id+'" rows="2">'+esc(l.internal_notes||"")+'</textarea></div>'
+      +   '<div class="field"><label>Interne notities</label><textarea id="nt-'+l.id+'" rows="2"'+(CAN_EDIT?'':' disabled')+'>'+esc(l.internal_notes||"")+'</textarea></div>'
       + '</div>'
-      + '<div class="savebar"><button class="btn primary sm" id="sv-'+l.id+'">Opslaan</button></div>'
+      + (CAN_EDIT ? '<div class="savebar"><button class="btn primary sm" id="sv-'+l.id+'">Opslaan</button></div>' : '<div class="small muted">Alleen-lezen (Viewer).</div>')
       + '</div>';
     holder.classList.remove("hide");
-    $("sv-"+l.id).addEventListener("click", function(){ saveLead(l.id); });
+    if(CAN_EDIT){ $("sv-"+l.id).addEventListener("click", function(){ saveLead(l.id); }); }
   }
 
   async function saveLead(id){
@@ -578,20 +615,42 @@
   async function loadAdmins(){
     var r=await db.from("admins").select("*").order("email");
     if(r.error){ $("admins-list").innerHTML='<p class="muted small">Kon beheerders niet laden.</p>'; return; }
-    var h='<table><tbody>';
+    var roles=["viewer","admin","super_admin"];
+    var h='<table><thead><tr><th>E-mail</th><th>Rol</th>'+(IS_SUPER?'<th></th>':'')+'</tr></thead><tbody>';
     (r.data||[]).forEach(function(a){
-      h+='<tr><td>'+esc(a.email)+'</td><td style="text-align:right;"><button class="btn danger sm" data-email="'+esc(a.email)+'">Verwijderen</button></td></tr>';
+      h+='<tr><td>'+esc(a.email)+'</td>';
+      if(IS_SUPER){
+        h+='<td><select class="role-sel" data-email="'+esc(a.email)+'" style="width:auto;">'
+          + roles.map(function(rl){return '<option value="'+rl+'"'+((a.role===rl)?" selected":"")+'>'+esc(ROLE_LABEL[rl]||rl)+'</option>';}).join('')
+          + '</select></td>'
+          + '<td style="text-align:right;"><button class="btn danger sm" data-del="'+esc(a.email)+'">Verwijderen</button></td>';
+      } else {
+        h+='<td>'+esc(ROLE_LABEL[a.role]||a.role)+'</td>';
+      }
+      h+='</tr>';
     });
     $("admins-list").innerHTML=h+'</tbody></table>';
-    $("admins-list").querySelectorAll("button[data-email]").forEach(function(b){
-      b.addEventListener("click", function(){ removeAdmin(b.dataset.email); });
-    });
+    if(IS_SUPER){
+      $("admins-list").querySelectorAll(".role-sel").forEach(function(s){
+        s.addEventListener("change", function(){ changeRole(s.dataset.email, s.value); });
+      });
+      $("admins-list").querySelectorAll("button[data-del]").forEach(function(b){
+        b.addEventListener("click", function(){ removeAdmin(b.dataset.del); });
+      });
+    }
+  }
+  async function changeRole(email, role){
+    var r=await db.rpc("set_admin_role",{ p_email:email, p_role:role });
+    if(r.error){ toast("Mislukt: "+r.error.message,true); loadAdmins(); return; }
+    if(!r.data || r.data.ok!==true){ toast((r.data&&r.data.message)||"Mislukt.",true); loadAdmins(); return; }
+    toast(r.data.message||"Rol bijgewerkt.");
   }
   $("add-admin").addEventListener("click", async function(){
     var email=$("new-admin").value.trim().toLowerCase();
+    var role=$("new-admin-role").value;
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ toast("Vul een geldig e-mailadres in.",true); return; }
     $("add-admin").disabled=true;
-    var r=await db.rpc("request_invite",{ p_email:email });
+    var r=await db.rpc("request_invite",{ p_email:email, p_role:role });
     $("add-admin").disabled=false;
     if(r.error){ toast("Mislukt: "+r.error.message,true); return; }
     if(!r.data || r.data.ok!==true){ toast((r.data&&r.data.message)||"Mislukt.",true); return; }
