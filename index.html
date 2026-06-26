@@ -100,18 +100,19 @@
   .ssc-choice .price{white-space:nowrap;font-weight:700;color:var(--c-accent-d);font-size:.92rem;}
   .ssc-choice .price.incl{color:var(--c-ok);}
   .ssc-choice input{margin-top:3px;width:18px;height:18px;accent-color:var(--c-primary);}
-  /* Uitklapbare uitleg ("ⓘ uitleg") bij groepen en opties */
-  .ssc-info-tog{display:inline-flex;align-items:center;gap:4px;background:none;border:none;color:var(--c-primary-d);
-    font-size:.78rem;cursor:pointer;padding:2px 0;margin-top:4px;font-family:inherit;font-weight:600;}
-  .ssc-info-tog:hover{text-decoration:underline;}
-  .ssc-info-tog .ic{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;
-    border:1.5px solid var(--c-primary-d);font-size:.62rem;font-style:italic;font-weight:700;line-height:1;}
-  .ssc-info-tog .ar{transition:transform .15s;}
-  .ssc-info-tog.open .ar{transform:rotate(180deg);}
-  .ssc-info{display:none;font-size:.83rem;color:var(--c-text);background:#faf8f3;border:1px solid var(--c-border);
-    border-radius:8px;padding:9px 11px;margin-top:6px;line-height:1.45;}
+  /* Nette uitleg: klein "i"-icoon naast titel/prijs + verzorgd uitklappaneel */
+  .ssc-group-head{display:flex;align-items:center;gap:8px;margin-bottom:.4em;}
+  .ssc-group-head > .lbl{margin:0;}
+  .ssc-choice{flex-direction:column;align-items:stretch;gap:0;}
+  .ssc-choice-main{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;width:100%;}
+  .ssc-right{display:flex;align-items:center;gap:9px;flex:none;}
+  .ssc-info-ic{flex:none;width:21px;height:21px;border-radius:50%;border:1px solid var(--c-border);background:#fff;
+    color:var(--c-muted);font:italic 700 .76rem/1 Georgia,"Times New Roman",serif;cursor:pointer;
+    display:inline-flex;align-items:center;justify-content:center;transition:.15s;}
+  .ssc-info-ic:hover,.ssc-info-ic.open{border-color:var(--c-primary);color:var(--c-primary-d);background:#faf6ea;}
+  .ssc-info{display:none;font-size:.84rem;color:var(--c-text);background:#faf8f3;border-left:3px solid var(--c-primary);
+    border-radius:0 8px 8px 0;padding:10px 13px;margin-top:11px;line-height:1.5;}
   .ssc-info.open{display:block;}
-  .ssc-group > .info-line{margin:-2px 0 8px;}
 
   /* Formuliervelden */
   .ssc-field{margin-bottom:14px;}
@@ -640,24 +641,25 @@
     var wrap = $("ssc-options"), html="";
     GROUPS.forEach(function(g){
       html += '<div class="ssc-group" data-group="'+g.key+'">';
-      html += '<span class="lbl">'+esc(g.label)+'</span>';
+      html += '<div class="ssc-group-head"><span class="lbl">'+esc(g.label)+'</span>'
+            + (g.info ? '<button type="button" class="ssc-info-ic" data-target="ginfo-'+g.key+'" title="Uitleg" aria-label="Uitleg">i</button>' : '')
+            + '</div>';
       if(g.hint){ html += '<div class="ssc-stepname" style="text-align:left;margin:-4px 0 8px;">'+esc(g.hint)+'</div>'; }
-      if(g.info){
-        html += '<div class="info-line">'
-              +   '<button type="button" class="ssc-info-tog" data-target="ginfo-'+g.key+'"><span class="ic">i</span> uitleg <span class="ar">▾</span></button>'
-              +   '<div class="ssc-info" id="ginfo-'+g.key+'">'+esc(g.info)+'</div>'
-              + '</div>';
-      }
+      if(g.info){ html += '<div class="ssc-info" id="ginfo-'+g.key+'">'+esc(g.info)+'</div>'; }
       g.options.forEach(function(o){
         var inputType = (g.type==="single") ? "radio" : "checkbox";
         html += '<label class="ssc-choice" data-group="'+g.key+'" data-opt="'+o.id+'">'
-              +   '<span class="c-l">'
-              +     '<input type="'+inputType+'" name="grp-'+g.key+'" value="'+o.id+'">'
-              +     '<span><span class="nm">'+esc(o.nm)+'</span><br><span class="ds">'+esc(o.ds)+'</span>'
-              +       (o.info ? '<br><button type="button" class="ssc-info-tog" data-target="oinfo-'+g.key+'-'+o.id+'"><span class="ic">i</span> meer uitleg <span class="ar">▾</span></button><div class="ssc-info" id="oinfo-'+g.key+'-'+o.id+'">'+esc(o.info)+'</div>' : '')
+              +   '<span class="ssc-choice-main">'
+              +     '<span class="c-l">'
+              +       '<input type="'+inputType+'" name="grp-'+g.key+'" value="'+o.id+'">'
+              +       '<span><span class="nm">'+esc(o.nm)+'</span><br><span class="ds">'+esc(o.ds)+'</span></span>'
+              +     '</span>'
+              +     '<span class="ssc-right">'
+              +       '<span class="price" data-price-for="'+g.key+'_'+o.id+'"></span>'
+              +       (o.info ? '<button type="button" class="ssc-info-ic" data-target="oinfo-'+g.key+'-'+o.id+'" title="Uitleg" aria-label="Uitleg">i</button>' : '')
               +     '</span>'
               +   '</span>'
-              +   '<span class="price" data-price-for="'+g.key+'_'+o.id+'"></span>'
+              +   (o.info ? '<div class="ssc-info" id="oinfo-'+g.key+'-'+o.id+'">'+esc(o.info)+'</div>' : '')
               + '</label>';
       });
       html += '</div>';
@@ -665,7 +667,7 @@
     wrap.innerHTML = html;
 
     // Uitleg-dropdowns in-/uitklappen (en voorkomen dat de optie wordt geselecteerd).
-    wrap.querySelectorAll(".ssc-info-tog").forEach(function(btn){
+    wrap.querySelectorAll(".ssc-info-ic").forEach(function(btn){
       btn.addEventListener("click", function(e){
         e.preventDefault(); e.stopPropagation();
         var panel = $(btn.getAttribute("data-target"));
