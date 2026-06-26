@@ -113,6 +113,11 @@
   .ssc-info{display:none;font-size:.84rem;color:var(--c-text);background:#faf8f3;border-left:3px solid var(--c-primary);
     border-radius:0 8px 8px 0;padding:10px 13px;margin-top:11px;line-height:1.5;}
   .ssc-info.open{display:block;}
+  /* "i" rechtsboven op de maatkaarten */
+  .ssc-opt-info{position:absolute;top:9px;right:9px;}
+  /* Pakketonderdelen met uitleg */
+  .pkg-item .pkg-ln{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .pkg-item .ssc-info{margin:6px 0 0;}
 
   /* Formuliervelden */
   .ssc-field{margin-bottom:14px;}
@@ -571,6 +576,18 @@
     return (typeof state.sizeIndex==="number") ? SIZES[state.sizeIndex].label : "";
   }
 
+  // Klikbare "i"-iconen voor uitleg-dropdowns (voorkomt dat de optie/maat geselecteerd wordt).
+  function attachInfoToggles(scope){
+    (scope||document).querySelectorAll(".ssc-info-ic").forEach(function(btn){
+      if(btn._wired) return; btn._wired=true;
+      btn.addEventListener("click", function(e){
+        e.preventDefault(); e.stopPropagation();
+        var panel = $(btn.getAttribute("data-target"));
+        if(panel){ panel.classList.toggle("open"); btn.classList.toggle("open", panel.classList.contains("open")); }
+      });
+    });
+  }
+
   // ---------- Render: maatkaarten ----------
   function renderSizes(){
     var wrap = $("ssc-sizes"), html="";
@@ -579,8 +596,10 @@
       var s = SIZES[i];
       html += '<label class="ssc-opt" data-i="'+i+'">'
             +   '<input type="radio" name="ssc-size" value="'+i+'">'
+            +   (s.info ? '<button type="button" class="ssc-info-ic ssc-opt-info" data-target="sinfo-'+i+'" title="Uitleg" aria-label="Uitleg">i</button>' : '')
             +   '<div class="t">'+esc(s.label)+'</div>'
             +   '<div class="sub">'+esc(s.vol)+' water</div>'
+            +   (s.info ? '<div class="ssc-info" id="sinfo-'+i+'">'+esc(s.info)+'</div>' : '')
             + '</label>';
     }
     // Maatwerk-kaart onderaan (geen prijs -> schatting/lead)
@@ -589,6 +608,7 @@
           +   '<div class="sub">Maatwerk of andere diepte</div>'
           + '</label>';
     wrap.innerHTML = html;
+    attachInfoToggles(wrap);
 
     wrap.querySelectorAll(".ssc-opt").forEach(function(el){
       el.addEventListener("click", function(){
@@ -631,9 +651,16 @@
   // De prijsindicatie verschijnt pas na het invullen van de contactgegevens.
   function renderPackage(){
     var wrap = $("ssc-package-lines");
-    wrap.innerHTML = STD_PACKAGE.map(function(c){
-      return '<div class="pkg-ln"><span>'+esc(c.nm)+'</span></div>';
+    wrap.innerHTML = STD_PACKAGE.map(function(c, idx){
+      var hasInfo = !!c.info;
+      return '<div class="pkg-item">'
+        +   '<div class="pkg-ln"><span>'+esc(c.nm)+'</span>'
+        +     (hasInfo ? '<button type="button" class="ssc-info-ic" data-target="pinfo-'+idx+'" title="Uitleg" aria-label="Uitleg">i</button>' : '')
+        +   '</div>'
+        +   (hasInfo ? '<div class="ssc-info" id="pinfo-'+idx+'">'+esc(c.info)+'</div>' : '')
+        + '</div>';
     }).join('');
+    attachInfoToggles(wrap);
   }
 
   // ---------- Render: optiegroepen ----------
@@ -667,13 +694,7 @@
     wrap.innerHTML = html;
 
     // Uitleg-dropdowns in-/uitklappen (en voorkomen dat de optie wordt geselecteerd).
-    wrap.querySelectorAll(".ssc-info-ic").forEach(function(btn){
-      btn.addEventListener("click", function(e){
-        e.preventDefault(); e.stopPropagation();
-        var panel = $(btn.getAttribute("data-target"));
-        if(panel){ panel.classList.toggle("open"); btn.classList.toggle("open", panel.classList.contains("open")); }
-      });
-    });
+    attachInfoToggles(wrap);
 
     // Standaardkeuzes voorselecteren (single)
     GROUPS.forEach(function(g){
@@ -1051,10 +1072,10 @@
       if(!dbSizes || !dbSizes.length || !dbGroups || !dbGroups.length){ return; }
 
       SIZES = dbSizes.map(function(s){
-        return { id:s.id, label:s.label, vol:s.vol_label, m3:Number(s.m3), base:Number(s.base_price) };
+        return { id:s.id, label:s.label, vol:s.vol_label, m3:Number(s.m3), base:Number(s.base_price), info:s.info||undefined };
       });
       STD_PACKAGE = (dbItems||[]).map(function(it){
-        return { nm:it.name, prices:(it.prices||[]).map(Number) };
+        return { nm:it.name, prices:(it.prices||[]).map(Number), info:it.info||undefined };
       });
       GROUPS = dbGroups.map(function(g){
         return {

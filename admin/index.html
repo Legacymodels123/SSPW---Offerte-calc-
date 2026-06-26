@@ -525,16 +525,21 @@
         +'<td class="num-cell"><input class="num" data-f="m3" type="number" step="0.01" value="'+s.m3+'"></td>'
         +'<td class="num-cell"><input class="num" data-f="base_price" type="number" step="0.01" value="'+s.base_price+'"></td>'
         +'</tr>';
+      h+='<tr class="info-row"><td colspan="5"><label class="small muted" style="margin-bottom:3px;">Uitleg bij deze maat — "ⓘ" in de calculator (optioneel)</label>'
+        +'<input data-info-for="'+s.id+'" value="'+esc(s.info||'')+'" placeholder="Leeg laten = geen uitleg"></td></tr>';
     });
     $("sizes-table").innerHTML=h+'</tbody></table>';
   }
 
   function renderItems(){
+    var span=1+SIZES.length;
     var h='<table><thead><tr><th>Onderdeel</th>'+sizeHeaders()+'</tr></thead><tbody>';
     ITEMS.forEach(function(it){
       h+='<tr data-id="'+it.id+'"><td><input data-f="name" value="'+esc(it.name)+'"></td>';
       for(var i=0;i<SIZES.length;i++){ h+='<td class="num-cell"><input class="num pr" type="number" step="0.01" value="'+((it.prices&&it.prices[i]!=null)?it.prices[i]:0)+'"></td>'; }
       h+='</tr>';
+      h+='<tr class="info-row"><td colspan="'+span+'"><label class="small muted" style="margin-bottom:3px;">Uitleg bij dit onderdeel — "ⓘ" in de calculator (optioneel)</label>'
+        +'<input data-info-for="'+it.id+'" value="'+esc(it.info||'')+'" placeholder="Leeg laten = geen uitleg"></td></tr>';
     });
     $("items-table").innerHTML=h+'</tbody></table>';
   }
@@ -566,10 +571,12 @@
   $("save-sizes").addEventListener("click", async function(){
     var rows = $("sizes-table").querySelectorAll("tr[data-id]"); var err=null;
     for(var k=0;k<rows.length;k++){ var tr=rows[k];
+      var infoEl=$("sizes-table").querySelector('[data-info-for="'+tr.dataset.id+'"]');
       var upd={ label:tr.querySelector('[data-f=label]').value,
                 vol_label:tr.querySelector('[data-f=vol_label]').value,
                 m3:Number(tr.querySelector('[data-f=m3]').value)||0,
                 base_price:Number(tr.querySelector('[data-f=base_price]').value)||0,
+                info:(infoEl && infoEl.value.trim()) ? infoEl.value.trim() : null,
                 updated_at:new Date().toISOString() };
       var r = await db.from("pricing_sizes").update(upd).eq("id",tr.dataset.id); if(r.error){err=r.error;break;}
     }
@@ -580,7 +587,12 @@
     var rows=$("items-table").querySelectorAll("tr[data-id]"); var err=null;
     for(var k=0;k<rows.length;k++){ var tr=rows[k];
       var prices=[].map.call(tr.querySelectorAll(".pr"),function(i){return Number(i.value)||0;});
-      var r=await db.from("pricing_package_items").update({name:tr.querySelector('[data-f=name]').value,prices:prices,updated_at:new Date().toISOString()}).eq("id",tr.dataset.id);
+      var infoEl=$("items-table").querySelector('[data-info-for="'+tr.dataset.id+'"]');
+      var r=await db.from("pricing_package_items").update({
+        name:tr.querySelector('[data-f=name]').value,
+        info:(infoEl && infoEl.value.trim()) ? infoEl.value.trim() : null,
+        prices:prices, updated_at:new Date().toISOString()
+      }).eq("id",tr.dataset.id);
       if(r.error){err=r.error;break;}
     }
     if(err){ toast("Opslaan mislukt: "+err.message,true);} else { toast("Onderdelen opgeslagen."); loadPricing(); }
